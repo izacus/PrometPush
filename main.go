@@ -1,5 +1,9 @@
 package main
 
+import (
+	cron "github.com/robfig/cron"
+)
+
 type Dogodek struct {
 	Id              uint64  `json:"id"`
 	Y_wgs           float64 `json:"y_wgs"`
@@ -20,5 +24,8 @@ type Dogodek struct {
 }
 
 func main() {
-	ParseData()
+	c := cron.New()
+	c.AddFunc("@every 10s", func() { ParseData() })
+	c.Start()
+	select {}
 }

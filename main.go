@@ -2,12 +2,14 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
+	log "github.com/Sirupsen/logrus"
+	"github.com/jinzhu/gorm"
+	_ "github.com/mattn/go-sqlite3"
 	"net/http"
 )
 
 type Dogodek struct {
-	Id              int64   `json:"id"`
+	Id              uint64  `json:"id"`
 	Y_wgs           float64 `json:"y_wgs"`
 	X_wgs           float64 `json:"x_wgs"`
 	Kategorija      string  `json:"kategorija"`
@@ -19,10 +21,10 @@ type Dogodek struct {
 	VzrokEn         string  `json:"vzrokEn"`
 	Prioriteta      int32   `json:"prioriteta"`
 	PrioritetaCeste int32   `json:"prioritetaCeste"`
-	Vneseno         int64   `json:"vneseno"`
-	Updated         int64   `json:"updated"`
-	VeljavnostOd    int64   `json:"veljavnostOd"`
-	VeljavnostDo    int64   `json:"veljavnostDo"`
+	Vneseno         uint64  `json:"vneseno"`
+	Updated         uint64  `json:"updated"`
+	VeljavnostOd    uint64  `json:"veljavnostOd"`
+	VeljavnostDo    uint64  `json:"veljavnostDo"`
 }
 
 func main() {
@@ -32,13 +34,39 @@ func main() {
 		} `json:"dogodki"`
 	}
 
+	log.Info("Retrieving traffic data...")
 	response, _ := http.Get("http://opendata.si/promet/events/")
 	defer response.Body.Close()
 
 	dec := json.NewDecoder(response.Body)
 	dec.Decode(&data)
 
+	log.WithFields(log.Fields{"status": response.Status, "num": len(data.Dogodki.D)}).Info("Data retrieval ok.")
+
+	// Save data to database
+	db, _ := gorm.Open("sqlite3", "events.db")
+	defer db.Close()
+
+	db.DB()
+	db.AutoMigrate(&Dogodek{})
+
+	var newEventIds []uint64
+
+	tx := db.Begin()
 	for _, item := range data.Dogodki.D {
-		fmt.Printf("%d - %s/%s\n", item.Id, item.Cesta, item.Vzrok)
+		var existing Dogodek
+		tx.First(&existing, item.Id)
+
+		// Existing item found
+		if existing.Id == item.Id {
+			continue
+		}
+
+		tx.Create(&item)
+		newEventIds = append(newEventIds, item.Id)
 	}
+
+	tx.Commit()
+
+	log.WithFields(log.Fields{"ids": newEventIds}).Info(len(newEventIds), " new events found.")
 }

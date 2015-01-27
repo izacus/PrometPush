@@ -3,8 +3,6 @@ package main
 import (
 	"encoding/json"
 	log "github.com/Sirupsen/logrus"
-	"github.com/jinzhu/gorm"
-	_ "github.com/mattn/go-sqlite3"
 	"net/http"
 )
 
@@ -25,11 +23,8 @@ func ParseData() []uint64 {
 	log.WithFields(log.Fields{"status": response.Status, "num": len(data.Dogodki.D)}).Info("Data retrieval ok.")
 
 	// Save data to database
-	db, _ := gorm.Open("sqlite3", "events.db")
+	db := GetDbConnection()
 	defer db.Close()
-
-	db.DB()
-	db.AutoMigrate(&Dogodek{})
 
 	var newEventIds []uint64
 
@@ -46,10 +41,8 @@ func ParseData() []uint64 {
 		tx.Create(&item)
 		newEventIds = append(newEventIds, item.Id)
 	}
-
 	tx.Commit()
 
 	log.WithFields(log.Fields{"ids": newEventIds}).Info(len(newEventIds), " new events found.")
-
 	return newEventIds
 }

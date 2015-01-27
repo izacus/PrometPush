@@ -1,7 +1,10 @@
 package main
 
 import (
+	log "github.com/Sirupsen/logrus"
+	"github.com/julienschmidt/httprouter"
 	cron "github.com/robfig/cron"
+	"net/http"
 )
 
 type Dogodek struct {
@@ -24,8 +27,14 @@ type Dogodek struct {
 }
 
 func main() {
+	log.SetLevel(log.DebugLevel)
+
 	c := cron.New()
-	c.AddFunc("@every 10s", func() { ParseData() })
+	c.AddFunc("@every 2m", func() { ParseData() })
 	c.Start()
-	select {}
+
+	// Register HTTP functions
+	router := httprouter.New()
+	router.POST("/register", RegisterPush)
+	log.Fatal(http.ListenAndServe(":8080", router))
 }

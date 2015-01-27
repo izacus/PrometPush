@@ -13,14 +13,19 @@ func ParseData() []uint64 {
 		} `json:"dogodki"`
 	}
 
-	log.Info("Retrieving traffic data...")
-	response, _ := http.Get("http://opendata.si/promet/events/")
+	log.Debug("Retrieving traffic data...")
+	response, err := http.Get("http://opendata.si/promet/events/")
 	defer response.Body.Close()
+
+	if err != nil {
+		log.WithFields(log.Fields{"status": response.Status, "err": err}).Error("Failed to retrieve data from server.")
+		return []uint64{}
+	}
 
 	dec := json.NewDecoder(response.Body)
 	dec.Decode(&data)
 
-	log.WithFields(log.Fields{"status": response.Status, "num": len(data.Dogodki.D)}).Info("Data retrieval ok.")
+	log.WithFields(log.Fields{"status": response.Status, "num": len(data.Dogodki.D)}).Debug("Data retrieval ok.")
 
 	// Save data to database
 	db := GetDbConnection()
@@ -43,6 +48,6 @@ func ParseData() []uint64 {
 	}
 	tx.Commit()
 
-	log.WithFields(log.Fields{"ids": newEventIds}).Info(len(newEventIds), " new events found.")
+	log.WithFields(log.Fields{"num": len(data.Dogodki.D), "ids": newEventIds}).Info(len(newEventIds), " new events found.")
 	return newEventIds
 }

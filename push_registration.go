@@ -51,7 +51,32 @@ func RegisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	w.Write([]byte("OK"))
 }
 
+func UnregisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	b, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Error("Failed to read ApiKey from request.")
+		return
+	}
+
+	apiKeyStr := string(b)
+
+	// Check if key already exists
+	db := GetDbConnection()
+	defer db.Close()
+	query := db.Where("key = ?", apiKeyStr).Delete(ApiKey{})
+	if query.Error != nil {
+		log.WithFields(log.Fields{"err": query.Error, "apiKey": apiKeyStr, "ua": r.UserAgent()}).Error("Failed to unregister api api key!")
+		returnError(w)
+		return
+	}
+
+	log.WithFields(log.Fields{"apiKey": apiKeyStr, "ua": r.UserAgent()}).Info("Removed API key registration.")
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK"))
+}
+
 func returnError(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusInternalServerError)
-	w.Write([]byte("Failed to register ApiKey."))
+	w.Write([]byte("Failed to process request."))
 }

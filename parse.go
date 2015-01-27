@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-func ParseData() []uint64 {
+func ParseData(eventIdsChannel chan<- []uint64) {
 	var data struct {
 		Dogodki struct {
 			D []Dogodek `json:"dogodek"`
@@ -19,7 +19,7 @@ func ParseData() []uint64 {
 
 	if err != nil {
 		log.WithFields(log.Fields{"status": response.Status, "err": err}).Error("Failed to retrieve data from server.")
-		return []uint64{}
+		return
 	}
 
 	dec := json.NewDecoder(response.Body)
@@ -49,5 +49,6 @@ func ParseData() []uint64 {
 	tx.Commit()
 
 	log.WithFields(log.Fields{"num": len(data.Dogodki.D), "ids": newEventIds}).Info(len(newEventIds), " new events found.")
-	return newEventIds
+
+	eventIdsChannel <- newEventIds
 }

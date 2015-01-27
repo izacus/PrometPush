@@ -18,7 +18,7 @@ func main() {
 			f, _ := os.Create("log/promet_push.log")
 			defer f.Close()
 			log.SetOutput(f)
-			log.SetFormatter(log.TextFormatter)
+			log.SetFormatter(new(log.TextFormatter))
 		}
 	}
 

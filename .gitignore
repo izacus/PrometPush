@@ -1,0 +1,5 @@
+*.swp
+promet_push.config
+log/
+*.db
+promet_push

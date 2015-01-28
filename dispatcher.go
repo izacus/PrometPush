@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
+	"github.com/jinzhu/gorm"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -13,10 +14,24 @@ import (
 const GCM_ENDPOINT = "https://android.googleapis.com/gcm/send"
 const PAGE_SIZE = 1000
 
+type PushEvent struct {
+	Id      uint64  `json:"id"`
+	Cause   string  `json:"cause"`
+	CauseEn string  `json:"causeEn"`
+	Road    string  `json:"road"`
+	RoadEn  string  `json:"roadEn"`
+	Time    uint64  `json:"created"`
+	Valid   uint64  `json:"validUntil"`
+	Y_wgs   float64 `json:"y_wgs"`
+	X_wgs   float64 `json:"x_wgs"`
+}
+
 type PushPayload struct {
 	RegistrationIds []string `json:"registration_ids"`
-	Data            struct{} `json:"data"`
-	DryRun          bool     `json:"dry_run"`
+	Data            struct {
+		Events []PushEvent `json:"events"`
+	} `json:"data"`
+	DryRun bool `json:"dry_run"`
 }
 
 func PushDispatcher(eventIdsChannel <-chan []uint64, gcmApiKey string) {
@@ -29,6 +44,8 @@ func PushDispatcher(eventIdsChannel <-chan []uint64, gcmApiKey string) {
 		db := GetDbConnection()
 		tx := db.Begin()
 
+		data := getData(tx, ids)
+
 		var keyCount int
 		tx.Model(&ApiKey{}).Count(&keyCount)
 		pages := int(math.Ceil(float64(keyCount) / float64(PAGE_SIZE)))
@@ -38,6 +55,7 @@ func PushDispatcher(eventIdsChannel <-chan []uint64, gcmApiKey string) {
 			var keys []string
 			tx.Limit(PAGE_SIZE).Offset(page*PAGE_SIZE).Model(&ApiKey{}).Pluck("key", &keys)
 			payload := PushPayload{RegistrationIds: keys, DryRun: true}
+			payload.Data.Events = data
 			dispatchPayload(payload, gcmApiKey)
 		}
 
@@ -46,9 +64,22 @@ func PushDispatcher(eventIdsChannel <-chan []uint64, gcmApiKey string) {
 	}
 }
 
+func getData(tx *gorm.DB, ids []uint64) []PushEvent {
+	events := make([]PushEvent, len(ids))
+
+	for i := 0; i < len(ids); i++ {
+		var event Dogodek
+		tx.First(&event, ids[i])
+		events[i] = PushEvent{Id: event.Id, Cause: event.Vzrok, CauseEn: event.VzrokEn, Road: event.Cesta, RoadEn: event.CestaEn, Time: event.Vneseno, Valid: event.VeljavnostDo, Y_wgs: event.Y_wgs, X_wgs: event.X_wgs}
+	}
+
+	return events
+}
+
 func dispatchPayload(payload PushPayload, gcmApiKey string) error {
 	var json_data bytes.Buffer
 	json.NewEncoder(&json_data).Encode(payload)
+	log.WithField("payload", json_data.String()).Debug("Dispatching pushes.")
 
 	request, _ := http.NewRequest("POST", GCM_ENDPOINT, &json_data)
 	request.Header.Set("Content-Type", "application/json")

@@ -16,7 +16,7 @@ type Config struct {
 }
 
 func main() {
-	log.SetLevel(log.DebugLevel)
+	log.SetLevel(log.InfoLevel)
 
 	// Set logging to file when running in production
 	if len(os.Args) > 1 {
@@ -40,7 +40,7 @@ func main() {
 
 	ParseData(eventIdsChannel)
 	c := cron.New()
-	c.AddFunc("@every 2m", func() { ParseData(eventIdsChannel) })
+	c.AddFunc("@every 6m", func() { ParseData(eventIdsChannel) })
 	c.Start()
 
 	// Register HTTP functions

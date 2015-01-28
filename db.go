@@ -40,8 +40,8 @@ func GetDbConnection() gorm.DB {
 	}
 
 	db.DB()
-
 	db.LogMode(false)
+
 	if (!db.HasTable(&ApiKey{})) {
 		db.AutoMigrate(&Dogodek{}, &ApiKey{})
 		db.Model(&ApiKey{}).AddUniqueIndex("idx_api_key", "key")

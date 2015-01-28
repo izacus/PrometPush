@@ -144,7 +144,7 @@ func processResponse(tx *gorm.DB, registrationIds []string, response PushRespons
 	// Process canonical IDs and non-registered clients
 	for i := 0; i < len(registrationIds); i++ {
 		if len(response.Results[i].Error) > 0 {
-			if response.Results[i].Error == "NotRegistered" {
+			if response.Results[i].Error == "NotRegistered" || response.Results[i].Error == "InvalidRegistration" {
 				log.WithField("apiKey", registrationIds[i]).Info("Removing not registered push key.")
 				tx.Where("key = ?", registrationIds[i]).Delete(ApiKey{})
 			} else {

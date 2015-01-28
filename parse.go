@@ -35,11 +35,9 @@ func ParseData(eventIdsChannel chan<- []uint64) {
 
 	tx := db.Begin()
 	for _, item := range data.Dogodki.D {
-		var existing Dogodek
-		tx.First(&existing, item.Id)
-
-		// Existing item found
-		if existing.Id == item.Id {
+		var count int
+		tx.Where("id = ?", item.Id).Model(&Dogodek{}).Count(&count)
+		if count > 0 {
 			continue
 		}
 

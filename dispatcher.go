@@ -102,6 +102,7 @@ func dispatchPayload(tx *gorm.DB, payload PushPayload, gcmApiKey string) error {
 
 	client := &http.Client{}
 
+	// Set payload with exponential backoff
 	retryCount := 5
 	retrySecs := 10
 
@@ -161,6 +162,8 @@ func processResponse(tx *gorm.DB, registrationIds []string, response PushRespons
 			if tx.NewRecord(key) {
 				tx.Save(key)
 			}
+
+			log.WithFields(log.Fields{"old": registrationIds[i], "new": response.Results[i].RegistrationId}).Info("Replacing GCM key with canonical version.")
 		}
 	}
 }

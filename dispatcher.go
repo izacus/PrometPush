@@ -6,9 +6,9 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/jinzhu/gorm"
-	"io/ioutil"
 	"math"
 	"net/http"
+	"time"
 )
 
 const GCM_ENDPOINT = "https://android.googleapis.com/gcm/send"
@@ -31,7 +31,19 @@ type PushPayload struct {
 	Data            struct {
 		Events []PushEvent `json:"events"`
 	} `json:"data"`
-	DryRun bool `json:"dry_run"`
+	TimeToLive uint32 `json:"time_to_live"`
+	DryRun     bool   `json:"dry_run"`
+}
+
+type PushResponse struct {
+	Success      uint32 `json:"success"`
+	Failure      uint32 `json:"failure"`
+	CanonicalIds uint32 `json:"canonical_ids"`
+	Results      []struct {
+		MessageId      string `json:"message_id"`
+		RegistrationId string `json:"registration_id"`
+		Error          string `json:"error"`
+	} `json:"results"`
 }
 
 func PushDispatcher(eventIdsChannel <-chan []uint64, gcmApiKey string) {
@@ -39,6 +51,9 @@ func PushDispatcher(eventIdsChannel <-chan []uint64, gcmApiKey string) {
 	for {
 		ids := <-eventIdsChannel
 		log.WithField("ids", ids).Debug("New ids received.")
+		/*		if len(ids) == 0 {
+				continue
+			} */
 
 		// Paginate apikeys on a page boundary due to GCM server limit
 		db := GetDbConnection()
@@ -54,12 +69,12 @@ func PushDispatcher(eventIdsChannel <-chan []uint64, gcmApiKey string) {
 			// Get list of ApiKeys
 			var keys []string
 			tx.Limit(PAGE_SIZE).Offset(page*PAGE_SIZE).Model(&ApiKey{}).Pluck("key", &keys)
-			payload := PushPayload{RegistrationIds: keys, DryRun: true}
+			payload := PushPayload{RegistrationIds: keys, TimeToLive: 7200, DryRun: true}
 			payload.Data.Events = data
-			dispatchPayload(payload, gcmApiKey)
+			dispatchPayload(tx, payload, gcmApiKey)
 		}
 
-		tx.Close()
+		tx.Commit()
 		db.Close()
 	}
 }
@@ -76,7 +91,7 @@ func getData(tx *gorm.DB, ids []uint64) []PushEvent {
 	return events
 }
 
-func dispatchPayload(payload PushPayload, gcmApiKey string) error {
+func dispatchPayload(tx *gorm.DB, payload PushPayload, gcmApiKey string) error {
 	var json_data bytes.Buffer
 	json.NewEncoder(&json_data).Encode(payload)
 	log.WithField("payload", json_data.String()).Debug("Dispatching pushes.")
@@ -86,15 +101,66 @@ func dispatchPayload(payload PushPayload, gcmApiKey string) error {
 	request.Header.Set("Authorization", fmt.Sprintf("key=%s", gcmApiKey))
 
 	client := &http.Client{}
-	response, err := client.Do(request)
-	if err != nil {
-		log.WithFields(log.Fields{"err": err, "data": json_data}).Error("Failed to send GCM package.")
-		return err
+
+	retryCount := 5
+	retrySecs := 10
+
+	var response *http.Response
+	var err error
+
+	for {
+		response, err = client.Do(request)
+		if response.StatusCode > 499 && response.StatusCode < 600 {
+			time.Sleep(time.Duration(retrySecs) * time.Second)
+			retryCount = retryCount - 1
+			retrySecs = retrySecs * 2
+			continue
+		}
+
+		if err != nil {
+			log.WithFields(log.Fields{"err": err, "data": json_data}).Error("Failed to send GCM package.")
+			return err
+		}
+
+		if err == nil || retryCount <= 0 {
+			break
+		}
 	}
 
+	var pushResponse PushResponse
 	defer response.Body.Close()
-	body, _ := ioutil.ReadAll(response.Body)
+	dec := json.NewDecoder(response.Body)
+	dec.Decode(&pushResponse)
 
-	log.WithFields(log.Fields{"status": response.Status, "body": string(body)}).Info("Dispatch OK.")
+	log.WithFields(log.Fields{"status": response.Status, "r": pushResponse}).Info("Dispatch OK.")
+	processResponse(tx, payload.RegistrationIds, pushResponse)
+
 	return nil
+}
+
+func processResponse(tx *gorm.DB, registrationIds []string, response PushResponse) {
+
+	// Process canonical IDs and non-registered clients
+	for i := 0; i < len(registrationIds); i++ {
+		if len(response.Results[i].Error) > 0 {
+			if response.Results[i].Error == "NotRegistered" {
+				log.WithField("apiKey", registrationIds[i]).Info("Removing not registered push key.")
+				tx.Where("key = ?", registrationIds[i]).Delete(ApiKey{})
+			} else {
+				log.WithFields(log.Fields{"error": response.Results[i].Error}).Warn("Unknown push error.")
+			}
+		}
+
+		if len(response.Results[i].RegistrationId) > 0 {
+			// Replace our push key with a new one
+			tx.Where("key = ?", registrationIds[i]).Delete(ApiKey{})
+
+			key := ApiKey{Key: response.Results[i].RegistrationId, RegistrationTime: time.Now().Unix(), UserAgent: "From Google"}
+			tx.Where("key = ?", response.Results[i].RegistrationId).FirstOrInit(&key)
+
+			if tx.NewRecord(key) {
+				tx.Save(key)
+			}
+		}
+	}
 }

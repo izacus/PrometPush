@@ -39,8 +39,8 @@ func GetDbConnection() gorm.DB {
 		panic("Could not connect to database!")
 	}
 
-	db.DB()
 	db.LogMode(false)
+	db.SingularTable(true)
 
 	if (!db.HasTable(&ApiKey{})) {
 		db.AutoMigrate(&Dogodek{}, &ApiKey{})

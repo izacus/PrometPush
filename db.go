@@ -3,7 +3,7 @@ package main
 import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/jinzhu/gorm"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/lib/pq"
 )
 
 type Dogodek struct {
@@ -11,10 +11,10 @@ type Dogodek struct {
 	Y_wgs           float64 `json:"y_wgs"`
 	X_wgs           float64 `json:"x_wgs"`
 	Kategorija      string  `json:"kategorija"`
-	Opis            string  `json:"opis"`
+	Opis            string  `json:"opis" sql:"type:text"`
 	Cesta           string  `json:"cesta"`
 	Vzrok           string  `json:"vzrok"`
-	OpisEn          string  `json:"opisEn"`
+	OpisEn          string  `json:"opisEn" sql:"type:text"`
 	CestaEn         string  `json:"cestaEn"`
 	VzrokEn         string  `json:"vzrokEn"`
 	Prioriteta      int32   `json:"prioriteta"`
@@ -28,12 +28,12 @@ type Dogodek struct {
 type ApiKey struct {
 	Id               int64
 	Key              string
-	RegistrationTime int64 `sql:"DEFAULT:current_timestamp"`
+	RegistrationTime int64
 	UserAgent        string
 }
 
 func GetDbConnection() gorm.DB {
-	db, err := gorm.Open("sqlite3", "events.db")
+	db, err := gorm.Open("postgres", "dbname=promet_push sslmode=disable")
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("Failed to connect to database.")
 		panic("Could not connect to database!")

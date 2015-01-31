@@ -51,9 +51,9 @@ func PushDispatcher(eventIdsChannel <-chan []uint64, gcmApiKey string) {
 	for {
 		ids := <-eventIdsChannel
 		log.WithField("ids", ids).Debug("New ids received.")
-		/*		if len(ids) == 0 {
-				continue
-			} */
+		if len(ids) == 0 {
+			continue
+		}
 
 		// Paginate apikeys on a page boundary due to GCM server limit
 		db := GetDbConnection()
@@ -69,7 +69,7 @@ func PushDispatcher(eventIdsChannel <-chan []uint64, gcmApiKey string) {
 			// Get list of ApiKeys
 			var keys []string
 			tx.Limit(PAGE_SIZE).Offset(page*PAGE_SIZE).Model(&ApiKey{}).Pluck("key", &keys)
-			payload := PushPayload{RegistrationIds: keys, TimeToLive: 7200, DryRun: true}
+			payload := PushPayload{RegistrationIds: keys, TimeToLive: 7200, DryRun: false}
 			payload.Data.Events = data
 			dispatchPayload(tx, payload, gcmApiKey)
 		}

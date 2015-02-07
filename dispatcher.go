@@ -15,15 +15,17 @@ const GCM_ENDPOINT = "https://android.googleapis.com/gcm/send"
 const PAGE_SIZE = 1000
 
 type PushEvent struct {
-	Id      uint64  `json:"id"`
-	Cause   string  `json:"cause"`
-	CauseEn string  `json:"causeEn"`
-	Road    string  `json:"road"`
-	RoadEn  string  `json:"roadEn"`
-	Time    uint64  `json:"created"`
-	Valid   uint64  `json:"validUntil"`
-	Y_wgs   float64 `json:"y_wgs"`
-	X_wgs   float64 `json:"x_wgs"`
+	Id            uint64  `json:"id"`
+	Cause         string  `json:"cause"`
+	CauseEn       string  `json:"causeEn"`
+	Road          string  `json:"road"`
+	RoadEn        string  `json:"roadEn"`
+	RoadPriority  int32   `json:"roadPriority"`
+	IsBorderXsing bool    `json:"isBorderCrossing"`
+	Time          uint64  `json:"created"`
+	Valid         uint64  `json:"validUntil"`
+	Y_wgs         float64 `json:"y_wgs"`
+	X_wgs         float64 `json:"x_wgs"`
 }
 
 type PushPayload struct {
@@ -85,7 +87,7 @@ func getData(tx *gorm.DB, ids []uint64) []PushEvent {
 	for i := 0; i < len(ids); i++ {
 		var event Dogodek
 		tx.First(&event, ids[i])
-		events[i] = PushEvent{Id: event.Id, Cause: event.Vzrok, CauseEn: event.VzrokEn, Road: event.Cesta, RoadEn: event.CestaEn, Time: event.Vneseno, Valid: event.VeljavnostDo, Y_wgs: event.Y_wgs, X_wgs: event.X_wgs}
+		events[i] = PushEvent{Id: event.Id, Cause: event.Vzrok, CauseEn: event.VzrokEn, Road: event.Cesta, RoadEn: event.CestaEn, IsBorderXsing: event.MejniPrehod, RoadPriority: event.PrioritetaCeste, Time: event.Vneseno, Valid: event.VeljavnostDo, Y_wgs: event.Y_wgs, X_wgs: event.X_wgs}
 	}
 
 	return events

@@ -19,6 +19,7 @@ type Dogodek struct {
 	VzrokEn         string  `json:"vzrokEn"`
 	Prioriteta      int32   `json:"prioriteta"`
 	PrioritetaCeste int32   `json:"prioritetaCeste"`
+	MejniPrehod     bool    `json:"isMejniPrehod" sql:"default:false"`
 	Vneseno         uint64  `json:"vneseno"`
 	Updated         uint64  `json:"updated"`
 	VeljavnostOd    uint64  `json:"veljavnostOd"`

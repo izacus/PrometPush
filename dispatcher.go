@@ -21,6 +21,8 @@ type PushEvent struct {
 	Road          string  `json:"road"`
 	RoadEn        string  `json:"roadEn"`
 	RoadPriority  int32   `json:"roadPriority"`
+	Description   string  `json:"description"`
+	DescriptionEn string  `json:"descriptionEn"`
 	IsBorderXsing bool    `json:"isBorderCrossing"`
 	Time          uint64  `json:"created"`
 	Valid         uint64  `json:"validUntil"`
@@ -87,7 +89,34 @@ func getData(tx *gorm.DB, ids []uint64) []PushEvent {
 	for i := 0; i < len(ids); i++ {
 		var event Dogodek
 		tx.First(&event, ids[i])
-		events[i] = PushEvent{Id: event.Id, Cause: event.Vzrok, CauseEn: event.VzrokEn, Road: event.Cesta, RoadEn: event.CestaEn, IsBorderXsing: event.MejniPrehod, RoadPriority: event.PrioritetaCeste, Time: event.Vneseno, Valid: event.VeljavnostDo, Y_wgs: event.Y_wgs, X_wgs: event.X_wgs}
+
+		var desc string
+		var descEn string
+
+		// Devices won't show description in the notification if
+		// there's more than one incoming so include it only when there's
+		// a single event. This mainly prevents going over the push payload size.
+		if len(ids) == 1 {
+			desc = event.Opis
+			descEn = event.OpisEn
+		} else {
+			desc = ""
+			descEn = ""
+		}
+
+		events[i] = PushEvent{Id: event.Id,
+			Cause:         event.Vzrok,
+			CauseEn:       event.VzrokEn,
+			Road:          event.Cesta,
+			RoadEn:        event.CestaEn,
+			IsBorderXsing: event.MejniPrehod,
+			RoadPriority:  event.PrioritetaCeste,
+			Time:          event.Vneseno,
+			Valid:         event.VeljavnostDo,
+			Description:   desc,
+			DescriptionEn: descEn,
+			Y_wgs:         event.Y_wgs,
+			X_wgs:         event.X_wgs}
 	}
 
 	return events

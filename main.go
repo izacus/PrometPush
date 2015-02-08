@@ -46,7 +46,7 @@ func main() {
 	// Register HTTP functions
 	router := httprouter.New()
 	router.POST("/register", RegisterPush)
-	router.DELETE("/register", UnregisterPush)
+	router.POST("/unregister", UnregisterPush)
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
 

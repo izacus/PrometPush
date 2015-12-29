@@ -41,7 +41,7 @@ func ShowStatistics(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
     time_today := time.Date(time_now.Year(), time_now.Month(), time_now.Day(),
                             0, 0, 0, 0, time_now.Location())
 
-    err = db.Where("vneseno > ?", time_today.Unix()).Model(&Dogodek{}).Count(&count)
+    err = db.Where("vneseno > ?", time_today.Unix() / 1000).Model(&Dogodek{}).Count(&count)
     if err.Error != nil {
         log.WithFields(log.Fields{"err": err.Error}).Error("Failed to retrieve statistics.")
         count = -1

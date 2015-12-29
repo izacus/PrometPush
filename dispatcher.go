@@ -149,7 +149,7 @@ func dispatchPayload(tx *gorm.DB, payload PushPayload, gcmApiKey string) error {
 			retryCount = retryCount - 1
 			retrySecs = retrySecs * 2
 
-  			raven.CaptureErrorAndWait(err, nil)
+			raven.CaptureMessage(response.Status, nil)
 			GetStatistics().FailedDispatches++
 			continue
 		}
@@ -164,7 +164,7 @@ func dispatchPayload(tx *gorm.DB, payload PushPayload, gcmApiKey string) error {
 		if (response.StatusCode > 399 && response.StatusCode < 500) {
 			GetStatistics().FailedDispatches++
 			log.WithFields(log.Fields{"response": response.Status}).Error("Failed to dispatch notifications!")
-			raven.CaptureErrorAndWait(err, nil)
+			raven.CaptureMessage(response.Status, nil)
 			return err
 		}
 

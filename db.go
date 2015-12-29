@@ -40,6 +40,12 @@ func GetDbConnection() gorm.DB {
 		panic("Could not connect to database!")
 	}
 
+	err = db.DB().Ping()
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Error("Failed to connect to database.")
+		panic("Could not connect to database!")
+	}
+
 	db.LogMode(false)
 	db.SingularTable(true)
 

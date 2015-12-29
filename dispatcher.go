@@ -154,6 +154,11 @@ func dispatchPayload(tx *gorm.DB, payload PushPayload, gcmApiKey string) error {
 			return err
 		}
 
+		if (response.StatusCode > 399 && response.StatusCode < 500) {
+			log.WithFields(log.Fields{"response": response.Status}).Error("Failed to dispatch notifications!")
+			return err
+		}
+
 		if err == nil || retryCount <= 0 {
 			break
 		}

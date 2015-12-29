@@ -7,11 +7,13 @@ import (
 	cron "github.com/robfig/cron"
 	"net/http"
 	"os"
+	"github.com/getsentry/raven-go"
 )
 
 type Config struct {
 	Push struct {
 		ApiKey string
+		Dsn string
 	}
 }
 
@@ -30,6 +32,8 @@ func main() {
 	}
 
 	configuration := getConfiguration()
+	raven.SetDSN(configuration.Push.Dsn)
+
 	eventIdsChannel := make(chan []uint64)
 
 	// Retrieve the starting reference data

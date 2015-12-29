@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"time"
+	"github.com/getsentry/raven-go"
 )
 
 const GCM_ENDPOINT = "https://android.googleapis.com/gcm/send"
@@ -148,6 +149,7 @@ func dispatchPayload(tx *gorm.DB, payload PushPayload, gcmApiKey string) error {
 			retryCount = retryCount - 1
 			retrySecs = retrySecs * 2
 
+  			raven.CaptureErrorAndWait(err, nil)
 			GetStatistics().FailedDispatches++
 			continue
 		}
@@ -155,12 +157,14 @@ func dispatchPayload(tx *gorm.DB, payload PushPayload, gcmApiKey string) error {
 		if err != nil {
 			log.WithFields(log.Fields{"err": err, "data": json_data}).Error("Failed to send GCM package.")
 			GetStatistics().FailedDispatches++
+			raven.CaptureErrorAndWait(err, nil)
 			return err
 		}
 
 		if (response.StatusCode > 399 && response.StatusCode < 500) {
 			GetStatistics().FailedDispatches++
 			log.WithFields(log.Fields{"response": response.Status}).Error("Failed to dispatch notifications!")
+			raven.CaptureErrorAndWait(err, nil)
 			return err
 		}
 

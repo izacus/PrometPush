@@ -4,6 +4,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/jinzhu/gorm"
 	_ "github.com/lib/pq"
+	"github.com/getsentry/raven-go"
 )
 
 type Dogodek struct {
@@ -36,17 +37,19 @@ type ApiKey struct {
 func GetDbConnection() gorm.DB {
 	db, err := gorm.Open("postgres", "dbname=promet_push sslmode=disable")
 	if err != nil {
+		raven.CaptureErrorAndWait(err, nil)
 		log.WithFields(log.Fields{"err": err}).Error("Failed to connect to database.")
 		panic("Could not connect to database!")
 	}
 
 	err = db.DB().Ping()
 	if err != nil {
+		raven.CaptureErrorAndWait(err, nil)
 		log.WithFields(log.Fields{"err": err}).Error("Failed to connect to database.")
 		panic("Could not connect to database!")
 	}
 
-	db.LogMode(true)
+	db.LogMode(false)
 	db.SingularTable(true)
 
 	if (!db.HasTable(&ApiKey{})) {

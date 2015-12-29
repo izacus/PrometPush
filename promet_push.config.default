@@ -1,2 +1,3 @@
 [push]
 apiKey=APIKEY_HERE
+dsn=SENTRY_DSN_HERE

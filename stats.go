@@ -6,6 +6,7 @@ import (
     "net/http"
     "github.com/julienschmidt/httprouter"
     log "github.com/Sirupsen/logrus"
+    "github.com/getsentry/raven-go"
 )
 
 type Statistics struct {
@@ -22,6 +23,7 @@ type Statistics struct {
 var stats Statistics
 
 func ShowStatistics(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+    raven.SetHttpContext(raven.NewHttp(r))
     db := GetDbConnection()
 
     var count int 

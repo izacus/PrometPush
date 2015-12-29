@@ -6,12 +6,15 @@ import (
 	"io/ioutil"
 	"net/http"
 	"time"
+	"github.com/getsentry/raven-go"
 )
 
 func RegisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	raven.SetHttpContext(raven.NewHttp(r))
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("Failed to read ApiKey from request.")
+		raven.CaptureErrorAndWait(err, nil)
 		return
 	}
 
@@ -26,6 +29,7 @@ func RegisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	var count int32
 	query := tx.Model(&ApiKey{}).Where("key = ?", apiKeyStr).Count(&count)
 	if query.Error != nil {
+		raven.CaptureErrorAndWait(query.Error, nil)
 		log.WithFields(log.Fields{"err": query.Error}).Error("Failed to save new apikey to DB.")
 		returnError(w)
 		tx.Rollback()
@@ -34,6 +38,7 @@ func RegisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	if count == 0 {
 		query = tx.Create(ApiKey{Key: apiKeyStr, RegistrationTime: time.Now().Unix(), UserAgent: r.UserAgent()})
 		if query.Error != nil {
+			raven.CaptureErrorAndWait(query.Error, nil)
 			log.WithFields(log.Fields{"err": query.Error}).Error("Failed to save new apikey to DB.")
 			tx.Rollback()
 			returnError(w)
@@ -53,6 +58,7 @@ func RegisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 }
 
 func UnregisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	raven.SetHttpContext(raven.NewHttp(r))
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("Failed to read ApiKey from request.")
@@ -66,6 +72,7 @@ func UnregisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 	defer db.Close()
 	query := db.Where("key = ?", apiKeyStr).Delete(ApiKey{})
 	if query.Error != nil {
+		raven.CaptureErrorAndWait(query.Error, nil)
 		log.WithFields(log.Fields{"err": query.Error, "apiKey": apiKeyStr, "ua": r.UserAgent()}).Error("Failed to unregister api api key!")
 		returnError(w)
 		return

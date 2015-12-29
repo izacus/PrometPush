@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	log "github.com/Sirupsen/logrus"
 	"net/http"
+	"github.com/getsentry/raven-go"
 )
 
 func ParseData(eventIdsChannel chan<- []uint64) {
@@ -21,6 +22,8 @@ func ParseData(eventIdsChannel chan<- []uint64) {
 		} else {
 			log.WithFields(log.Fields{"err": err}).Error("Failed to retrieve data from server.")
 		}
+
+		raven.CaptureErrorAndWait(err, nil)
 		return
 	}
 	defer response.Body.Close()
@@ -43,7 +46,7 @@ func ParseData(eventIdsChannel chan<- []uint64) {
 		if len(newEventIds) > 0 {
 			continue
 		}
-		
+
 		if count > 0 {
 			continue
 		}

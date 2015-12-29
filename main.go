@@ -47,6 +47,7 @@ func main() {
 	router := httprouter.New()
 	router.POST("/register", RegisterPush)
 	router.POST("/unregister", UnregisterPush)
+	router.GET("/stats", ShowStatistics)
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
 

@@ -46,7 +46,7 @@ func GetDbConnection() gorm.DB {
 		panic("Could not connect to database!")
 	}
 
-	db.LogMode(false)
+	db.LogMode(true)
 	db.SingularTable(true)
 
 	if (!db.HasTable(&ApiKey{})) {

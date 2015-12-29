@@ -43,9 +43,10 @@ func ParseData(eventIdsChannel chan<- []uint64) {
 		if len(newEventIds) > 0 {
 			continue
 		}
-		/*	if count > 0 {
+		
+		if count > 0 {
 			continue
-		} */
+		}
 
 		tx.Create(&item)
 		newEventIds = append(newEventIds, item.Id)

@@ -142,19 +142,24 @@ func dispatchPayload(tx *gorm.DB, payload PushPayload, gcmApiKey string) error {
 
 	for {
 		response, err = client.Do(request)
+		GetStatistics().Dispatches++
 		if response.StatusCode > 499 && response.StatusCode < 600 {
 			time.Sleep(time.Duration(retrySecs) * time.Second)
 			retryCount = retryCount - 1
 			retrySecs = retrySecs * 2
+
+			GetStatistics().FailedDispatches++
 			continue
 		}
 
 		if err != nil {
 			log.WithFields(log.Fields{"err": err, "data": json_data}).Error("Failed to send GCM package.")
+			GetStatistics().FailedDispatches++
 			return err
 		}
 
 		if (response.StatusCode > 399 && response.StatusCode < 500) {
+			GetStatistics().FailedDispatches++
 			log.WithFields(log.Fields{"response": response.Status}).Error("Failed to dispatch notifications!")
 			return err
 		}
@@ -199,6 +204,7 @@ func processResponse(tx *gorm.DB, registrationIds []string, response PushRespons
 				tx.Save(key)
 			}
 
+			GetStatistics().UpdatedPushKeys++
 			log.WithFields(log.Fields{"old": registrationIds[i], "new": response.Results[i].RegistrationId}).Info("Replacing GCM key with canonical version.")
 		}
 	}

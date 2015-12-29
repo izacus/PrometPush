@@ -41,6 +41,7 @@ func RegisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		}
 
 		log.WithFields(log.Fields{"apiKey": apiKeyStr, "ua": r.UserAgent()}).Info("New API key registered.")
+		GetStatistics().DeviceRegistrations++
 	} else {
 		log.WithFields(log.Fields{"apiKey": apiKeyStr, "ua": r.UserAgent()}).Info("Skipping existing API key.")
 	}
@@ -71,6 +72,7 @@ func UnregisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 	}
 
 	log.WithFields(log.Fields{"apiKey": apiKeyStr, "ua": r.UserAgent()}).Info("Removed API key registration.")
+	GetStatistics().DeviceUnregistrations++
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))

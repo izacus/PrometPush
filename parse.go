@@ -15,12 +15,15 @@ func ParseData(eventIdsChannel chan<- []uint64) {
 
 	log.Debug("Retrieving traffic data...")
 	response, err := http.Get("http://opendata.si/promet/events/")
-	defer response.Body.Close()
-
 	if err != nil {
-		log.WithFields(log.Fields{"status": response.Status, "err": err}).Error("Failed to retrieve data from server.")
+		if response != nil {
+			log.WithFields(log.Fields{"status": response.Status, "err": err}).Error("Failed to retrieve data from server.")
+		} else {
+			log.WithFields(log.Fields{"err": err}).Error("Failed to retrieve data from server.")
+		}
 		return
 	}
+	defer response.Body.Close()
 
 	dec := json.NewDecoder(response.Body)
 	dec.Decode(&data)
@@ -37,9 +40,12 @@ func ParseData(eventIdsChannel chan<- []uint64) {
 	for _, item := range data.Dogodki.D {
 		var count int
 		tx.Where("id = ?", item.Id).Model(&Dogodek{}).Count(&count)
-		if count > 0 {
+		if len(newEventIds) > 0 {
 			continue
 		}
+		/*	if count > 0 {
+			continue
+		} */
 
 		tx.Create(&item)
 		newEventIds = append(newEventIds, item.Id)

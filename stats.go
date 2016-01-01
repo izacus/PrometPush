@@ -25,6 +25,7 @@ var stats Statistics
 func ShowStatistics(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
     raven.SetHttpContext(raven.NewHttp(r))
     db := GetDbConnection()
+    defer db.Close()
 
     var count int 
     err := db.Model(&ApiKey{}).Count(&count)
@@ -54,7 +55,7 @@ func ShowStatistics(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
     fmt.Fprintf(w, "today_failed_dispatches:%d\n", statistics.FailedDispatches)
     fmt.Fprintf(w, "today_device_registrations:%d\n", statistics.DeviceRegistrations)
     fmt.Fprintf(w, "today_device_unregistrations:%d\n", statistics.DeviceUnregistrations)
-    fmt.Fprintf(w, "today_device_updatedkeys:%d\n", statistics.UpdatedPushKeys)    
+    fmt.Fprintf(w, "today_device_updatedkeys:%d\n", statistics.UpdatedPushKeys)
 }
 
 func GetStatistics() *Statistics {

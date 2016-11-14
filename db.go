@@ -1,30 +1,37 @@
 package main
 
 import (
+	"time"
+
 	log "github.com/Sirupsen/logrus"
+	"github.com/getsentry/raven-go"
 	"github.com/jinzhu/gorm"
 	_ "github.com/lib/pq"
-	"github.com/getsentry/raven-go"
 )
 
 type Dogodek struct {
-	Id              uint64  `json:"id"`
+	Id              uint64  `json:"Id,string"`
 	Y_wgs           float64 `json:"y_wgs"`
 	X_wgs           float64 `json:"x_wgs"`
-	Kategorija      string  `json:"kategorija"`
-	Opis            string  `json:"opis" sql:"type:text"`
-	Cesta           string  `json:"cesta"`
-	Vzrok           string  `json:"vzrok"`
-	OpisEn          string  `json:"opisEn" sql:"type:text"`
-	CestaEn         string  `json:"cestaEn"`
-	VzrokEn         string  `json:"vzrokEn"`
-	Prioriteta      int32   `json:"prioriteta"`
-	PrioritetaCeste int32   `json:"prioritetaCeste"`
-	MejniPrehod     bool    `json:"isMejniPrehod" sql:"default:false"`
-	Vneseno         uint64  `json:"vneseno"`
-	Updated         uint64  `json:"updated"`
-	VeljavnostOd    uint64  `json:"veljavnostOd"`
-	VeljavnostDo    uint64  `json:"veljavnostDo"`
+	Kategorija      string  `json:"Kategorija"`
+	Opis            string  `json:"Description" sql:"type:text"`
+	Cesta           string  `json:"Cesta"`
+	Vzrok           string  `json:"Title"`
+	OpisEn          string
+	CestaEn         string
+	VzrokEn         string
+	Prioriteta      int32 `json:"Prioriteta"`
+	PrioritetaCeste int32 `json:"PrioritetaCeste"`
+	MejniPrehod     bool  `json:"isMejniPrehod" sql:"default:false"`
+	Vneseno         uint64
+
+	Updated      uint64
+	VeljavnostOd uint64
+	VeljavnostDo uint64
+
+	UpdatedTime      time.Time `json:"Updated"`
+	VeljavnostOdTime time.Time `json:"VeljavnostOd"`
+	VeljavnostDoTime time.Time `json:"VeljavnostDo"`
 }
 
 type ApiKey struct {
@@ -53,9 +60,10 @@ func GetDbConnection() gorm.DB {
 	db.SingularTable(true)
 
 	if (!db.HasTable(&ApiKey{})) {
-		db.AutoMigrate(&Dogodek{}, &ApiKey{})
+		db.AutoMigrate(&ApiKey{})
 		db.Model(&ApiKey{}).AddUniqueIndex("idx_api_key", "key")
 	}
 
+	db.AutoMigrate(&Dogodek{})
 	return db
 }

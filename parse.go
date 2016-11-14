@@ -2,16 +2,19 @@ package main
 
 import (
 	"encoding/json"
-	log "github.com/Sirupsen/logrus"
 	"net/http"
+
+	log "github.com/Sirupsen/logrus"
 	"github.com/getsentry/raven-go"
 )
 
 func ParseData(eventIdsChannel chan<- []uint64) {
 	var data struct {
-		Dogodki struct {
-			D []Dogodek `json:"dogodek"`
-		} `json:"dogodki"`
+		Contents []struct {
+			Data struct {
+				D []Dogodek `json:"Items"`
+			} `json:"Data"`
+		} `json:"Contents"`
 	}
 
 	log.Debug("Retrieving traffic data...")
@@ -31,7 +34,9 @@ func ParseData(eventIdsChannel chan<- []uint64) {
 	dec := json.NewDecoder(response.Body)
 	dec.Decode(&data)
 
-	log.WithFields(log.Fields{"status": response.Status, "num": len(data.Dogodki.D)}).Debug("Data retrieval ok.")
+	items := data.Contents[0].Data.D
+	log.WithFields(log.Fields{"status": response.Status, "num": len(items)}).Debug("Data retrieval ok.")
+	log.WithFields(log.Fields{"items": items}).Debug("Items retrieved.")
 
 	// Save data to database
 	db := GetDbConnection()
@@ -40,9 +45,16 @@ func ParseData(eventIdsChannel chan<- []uint64) {
 	var newEventIds []uint64
 
 	tx := db.Begin()
-	for _, item := range data.Dogodki.D {
+	for _, item := range items {
+		// Fix up date types
+		item.Updated = uint64(item.UpdatedTime.Unix())
+		item.VeljavnostDo = uint64(item.VeljavnostDoTime.Unix())
+		item.VeljavnostOd = uint64(item.VeljavnostOdTime.Unix())
+
 		var count int
 		tx.Where("id = ?", item.Id).Model(&Dogodek{}).Count(&count)
+		log.WithFields(log.Fields{"Count": count, "Id": item.Id}).Debug("Checking event.")
+
 		if len(newEventIds) > 0 {
 			continue
 		}
@@ -56,7 +68,7 @@ func ParseData(eventIdsChannel chan<- []uint64) {
 	}
 	tx.Commit()
 
-	log.WithFields(log.Fields{"num": len(data.Dogodki.D), "ids": newEventIds}).Info(len(newEventIds), " new events found.")
+	log.WithFields(log.Fields{"num": len(items), "ids": newEventIds}).Info(len(newEventIds), " new events found.")
 
 	eventIdsChannel <- newEventIds
 }

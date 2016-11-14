@@ -1,19 +1,20 @@
 package main
 
 import (
-	"code.google.com/p/gcfg"
-	log "github.com/Sirupsen/logrus"
-	"github.com/julienschmidt/httprouter"
-	cron "github.com/robfig/cron"
 	"net/http"
 	"os"
+
+	log "github.com/Sirupsen/logrus"
 	"github.com/getsentry/raven-go"
+	"github.com/julienschmidt/httprouter"
+	cron "github.com/robfig/cron"
+	"github.com/scalingdata/gcfg"
 )
 
 type Config struct {
 	Push struct {
 		ApiKey string
-		Dsn string
+		Dsn    string
 	}
 }
 

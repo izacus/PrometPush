@@ -113,8 +113,8 @@ func getData(tx *gorm.DB, ids []uint64) []PushEvent {
 			RoadEn:        event.CestaEn,
 			IsBorderXsing: event.MejniPrehod,
 			RoadPriority:  event.PrioritetaCeste,
-			Time:          event.Updated,
-			Valid:         event.VeljavnostDo,
+			Time:          event.Updated * 1000, // Need to convert to milliseconds
+			Valid:         event.VeljavnostDo * 1000,
 			Description:   desc,
 			DescriptionEn: descEn,
 			Y_wgs:         event.Y_wgs,

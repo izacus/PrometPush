@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	log "github.com/Sirupsen/logrus"
-	"github.com/jinzhu/gorm"
 	"math"
 	"net/http"
 	"time"
+
+	log "github.com/Sirupsen/logrus"
 	"github.com/getsentry/raven-go"
+	"github.com/jinzhu/gorm"
 )
 
 const GCM_ENDPOINT = "https://android.googleapis.com/gcm/send"
@@ -112,7 +113,7 @@ func getData(tx *gorm.DB, ids []uint64) []PushEvent {
 			RoadEn:        event.CestaEn,
 			IsBorderXsing: event.MejniPrehod,
 			RoadPriority:  event.PrioritetaCeste,
-			Time:          event.Vneseno,
+			Time:          event.Updated,
 			Valid:         event.VeljavnostDo,
 			Description:   desc,
 			DescriptionEn: descEn,
@@ -124,6 +125,8 @@ func getData(tx *gorm.DB, ids []uint64) []PushEvent {
 }
 
 func dispatchPayload(tx *gorm.DB, payload PushPayload, gcmApiKey string) error {
+	log.Debug("Dispatching...")
+
 	var json_data bytes.Buffer
 	json.NewEncoder(&json_data).Encode(payload)
 	log.WithField("payload", json_data.String()).Debug("Dispatching pushes.")
@@ -161,7 +164,7 @@ func dispatchPayload(tx *gorm.DB, payload PushPayload, gcmApiKey string) error {
 			return err
 		}
 
-		if (response.StatusCode > 399 && response.StatusCode < 500) {
+		if response.StatusCode > 399 && response.StatusCode < 500 {
 			GetStatistics().FailedDispatches++
 			log.WithFields(log.Fields{"response": response.Status}).Error("Failed to dispatch notifications!")
 			raven.CaptureMessage(response.Status, nil)

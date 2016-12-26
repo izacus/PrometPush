@@ -41,7 +41,7 @@ type ApiKey struct {
 	UserAgent        string
 }
 
-func GetDbConnection() gorm.DB {
+func GetDbConnection() *gorm.DB {
 	db, err := gorm.Open("postgres", "dbname=promet_push sslmode=disable")
 	if err != nil {
 		raven.CaptureErrorAndWait(err, nil)

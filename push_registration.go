@@ -1,12 +1,13 @@
 package main
 
 import (
-	log "github.com/Sirupsen/logrus"
-	"github.com/julienschmidt/httprouter"
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	log "github.com/Sirupsen/logrus"
 	"github.com/getsentry/raven-go"
+	"github.com/julienschmidt/httprouter"
 )
 
 func RegisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -36,7 +37,7 @@ func RegisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		return
 	}
 	if count == 0 {
-		query = tx.Create(ApiKey{Key: apiKeyStr, RegistrationTime: time.Now().Unix(), UserAgent: r.UserAgent()})
+		query = tx.Create(&ApiKey{Key: apiKeyStr, RegistrationTime: time.Now().Unix(), UserAgent: r.UserAgent()})
 		if query.Error != nil {
 			raven.CaptureErrorAndWait(query.Error, nil)
 			log.WithFields(log.Fields{"err": query.Error}).Error("Failed to save new apikey to DB.")

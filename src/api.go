@@ -1,30 +1,30 @@
 package main
 
 import (
+	"encoding/json"
 	log "github.com/Sirupsen/logrus"
 	"github.com/julienschmidt/httprouter"
 	"net/http"
-	"encoding/json"
 	"time"
 )
 
 type JsonEvent struct {
-	Id					uint64		`json:"id,string"`
-	Y_wgs				float64		`json:"y_wgs"`
-	X_wgs				float64		`json:"x_wgs"`
-	Category			string		`json:"category"`
-	DescriptionSl		string		`json:"description_sl"`
-	DescriptionEn		string		`json:"description_en"`
-	RoadSl				string		`json:"road_sl"`
-	RoadEn				string		`json:"road_en"`
-	CauseSl				string		`json:"cause_sl"`
-	CauseEn				string		`json:"cause_en"`
-	Priority 			int32		`json:"priority"`
-	RoadPriority		int32		`json:"road_priority"`
-	IsBorderCrossing	bool		`json:"is_border_crossing"`
-	Updated				time.Time	`json:"updated"`
-	ValidFrom			time.Time	`json:"valid_from"`
-	ValidTo				time.Time	`json:"valid_to"`
+	Id               uint64    `json:"id,string"`
+	Y_wgs            float64   `json:"y_wgs"`
+	X_wgs            float64   `json:"x_wgs"`
+	Category         string    `json:"category"`
+	DescriptionSl    string    `json:"description_sl"`
+	DescriptionEn    string    `json:"description_en"`
+	RoadSl           string    `json:"road_sl"`
+	RoadEn           string    `json:"road_en"`
+	CauseSl          string    `json:"cause_sl"`
+	CauseEn          string    `json:"cause_en"`
+	Priority         int32     `json:"priority"`
+	RoadPriority     int32     `json:"road_priority"`
+	IsBorderCrossing bool      `json:"is_border_crossing"`
+	Updated          time.Time `json:"updated"`
+	ValidFrom        time.Time `json:"valid_from"`
+	ValidTo          time.Time `json:"valid_to"`
 }
 
 var currentData []JsonEvent

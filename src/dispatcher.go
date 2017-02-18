@@ -52,10 +52,10 @@ type PushResponse struct {
 	} `json:"results"`
 }
 
-func PushDispatcher(eventIdsChannel <-chan Events, gcmApiKey string) {
+func PushDispatcher(eventIdsChannel <-chan []uint64, gcmApiKey string) {
 	log.WithField("serverApiKey", gcmApiKey).Debug("Initializing dispatcher.")
 	for {
-		ids := (<-eventIdsChannel).newEventIds
+		ids := <-eventIdsChannel
 		log.WithField("ids", ids).Debug("New ids received.")
 		if len(ids) == 0 {
 			continue

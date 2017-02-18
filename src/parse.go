@@ -49,7 +49,7 @@ func getEvents(english bool) ([]Dogodek, error) {
 	return items, nil
 }
 
-func ParseData(eventIdsChannel chan<- Events) {
+func ParseData(eventIdsChannel chan<- []uint64, eventsChannel chan <- []Dogodek) {
 	items, err := getEvents(false)
 	if err != nil {
 		return
@@ -107,5 +107,6 @@ func ParseData(eventIdsChannel chan<- Events) {
 	tx.Commit()
 
 	log.WithFields(log.Fields{"num": len(items), "ids": newEventIds}).Info(len(newEventIds), " new events found.")
-	eventIdsChannel <- Events{newEventIds, items}
+	eventIdsChannel <- newEventIds
+	eventsChannel <- items
 }

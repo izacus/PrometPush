@@ -37,16 +37,18 @@ func main() {
 	configuration := getConfiguration()
 	raven.SetDSN(configuration.Push.Dsn)
 
-	eventIdsChannel := make(chan Events)
+	eventIdsChannel := make(chan []uint64)
+	eventsChannel := make(chan []Dogodek)
 
 	// Dispatcher processor
 	router := httprouter.New()
 
 	go PushDispatcher(eventIdsChannel, configuration.Push.ApiKey)
+	go ApiService(eventsChannel, router)
 
-	ParseData(eventIdsChannel)
+	ParseData(eventIdsChannel, eventsChannel)
 	c := cron.New()
-	c.AddFunc("@every 6m", func() { ParseData(eventIdsChannel) })
+	c.AddFunc("@every 6m", func() { ParseData(eventIdsChannel, eventsChannel) })
 	c.Start()
 
 	// Register HTTP functions

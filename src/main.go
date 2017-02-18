@@ -40,17 +40,20 @@ func main() {
 	eventIdsChannel := make(chan []uint64)
 	eventsChannel := make(chan []Dogodek)
 	camerasChannel := make(chan []Camera)
+	pricesChannel := make(chan []GasStationPrice)
 
 	// Dispatcher processor
 	router := httprouter.New()
 
 	go PushDispatcher(eventIdsChannel, configuration.Push.ApiKey)
-	go ApiService(eventsChannel, camerasChannel, router)
+	go ApiService(eventsChannel, camerasChannel, pricesChannel, router)
 
 	ParseTrafficEvents(eventIdsChannel, eventsChannel)
 	ParseTrafficCameras(camerasChannel)
+	ParseFuelPrices(pricesChannel)
 	c := cron.New()
 	c.AddFunc("@every 6m", func() { ParseTrafficEvents(eventIdsChannel, eventsChannel) })
+	c.AddFunc("@every 6m", func() { ParseFuelPrices(pricesChannel) })
 	c.AddFunc("@every 30m", func() { ParseTrafficCameras(camerasChannel) })
 	c.Start()
 

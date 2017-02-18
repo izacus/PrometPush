@@ -28,12 +28,14 @@ type JsonEvent struct {
 }
 
 type ApiResponse struct {
-	Events  []JsonEvent `json:"events"`
-	Cameras []Camera    `json:"cameras"`
+	Events  []JsonEvent       `json:"events"`
+	Cameras []Camera          `json:"cameras"`
+	Prices  []GasStationPrice `json:"prices"`
 }
 
 var currentEvents []JsonEvent
 var currentCameras []Camera
+var currentPrices []GasStationPrice
 
 func ShowTrafficData(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	if currentEvents == nil || currentCameras == nil {
@@ -47,6 +49,7 @@ func ShowTrafficData(w http.ResponseWriter, r *http.Request, _ httprouter.Params
 
 	var events []JsonEvent
 	var cameras []Camera
+	var prices []GasStationPrice
 
 	if currentEvents == nil {
 		events = make([]JsonEvent, 0)
@@ -60,7 +63,13 @@ func ShowTrafficData(w http.ResponseWriter, r *http.Request, _ httprouter.Params
 		cameras = currentCameras
 	}
 
-	enc.Encode(ApiResponse{events, cameras})
+	if currentPrices == nil {
+		prices = make([]GasStationPrice, 0)
+	} else {
+		prices = currentPrices
+	}
+
+	enc.Encode(ApiResponse{events, cameras, prices})
 }
 
 func eventService(eventsChannel <-chan []Dogodek) {
@@ -104,9 +113,21 @@ func cameraService(camerasChannel <-chan []Camera) {
 	}
 }
 
-func ApiService(eventsChannel <-chan []Dogodek, camerasChannel <-chan []Camera, router *httprouter.Router) {
+func gasPricesService(pricesChannel <-chan []GasStationPrice) {
+	for {
+		prices := <-pricesChannel
+		currentPrices = prices
+		log.WithFields(log.Fields{"data": currentCameras}).Debug("Updated price data.")
+	}
+}
+
+func ApiService(eventsChannel <-chan []Dogodek,
+	camerasChannel <-chan []Camera,
+	pricesChannel <-chan []GasStationPrice,
+	router *httprouter.Router) {
 	router.GET("/data", ShowTrafficData)
 	log.Info("API hook registered.")
 	go eventService(eventsChannel)
 	go cameraService(camerasChannel)
+	go gasPricesService(pricesChannel)
 }

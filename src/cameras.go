@@ -1,34 +1,34 @@
 package main
 
 import (
-	log "github.com/Sirupsen/logrus"
-	"net/http"
-	"github.com/getsentry/raven-go"
 	"encoding/json"
+	log "github.com/Sirupsen/logrus"
+	"github.com/getsentry/raven-go"
+	"net/http"
 )
 
 type Camera struct {
-	LocationId		string `json:"location_id"`
-	Region	string	`json:"region"`
-	Text	string	`json:"text"`
-	ImageURL	string	`json:"image_url"`
-	X_wgs		float64	`json:"x_wgs"`
-	Y_wgs		float64	`json:"y_wgs"`
+	LocationId string  `json:"location_id"`
+	Region     string  `json:"region"`
+	Text       string  `json:"text"`
+	ImageURL   string  `json:"image_url"`
+	X_wgs      float64 `json:"x_wgs"`
+	Y_wgs      float64 `json:"y_wgs"`
 }
 
 type JsonCamera struct {
-	Region		string	`json:"Region"`
-	Image		string	`json:"Image"`
-	Text		string	`json:"Text"`
+	Region string `json:"Region"`
+	Image  string `json:"Image"`
+	Text   string `json:"Text"`
 }
 
 type JsonLocation struct {
-	Id			string `json:"Id"`
-	Title		string `json:"Title"`
-	Description	string `json:"Description"`
-	X_wgs		float64	`json:"x_wgs"`
-	Y_wgs		float64	`json:"y_wgs"`
-	Cameras		[]JsonCamera `json:"Kamere"`
+	Id          string       `json:"Id"`
+	Title       string       `json:"Title"`
+	Description string       `json:"Description"`
+	X_wgs       float64      `json:"x_wgs"`
+	Y_wgs       float64      `json:"y_wgs"`
+	Cameras     []JsonCamera `json:"Kamere"`
 }
 
 func ParseTrafficCameras(camerasChannel chan<- []Camera) error {

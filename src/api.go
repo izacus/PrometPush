@@ -28,8 +28,8 @@ type JsonEvent struct {
 }
 
 type ApiResponse struct {
-	Events		[]JsonEvent	`json:"events"`
-	Cameras		[]Camera	`json:"cameras"`
+	Events  []JsonEvent `json:"events"`
+	Cameras []Camera    `json:"cameras"`
 }
 
 var currentEvents []JsonEvent
@@ -41,7 +41,7 @@ func ShowTrafficData(w http.ResponseWriter, r *http.Request, _ httprouter.Params
 		return
 	}
 
-	w.Header()["Content-Type"] = []string{ "application/json" }
+	w.Header()["Content-Type"] = []string{"application/json"}
 	w.WriteHeader(http.StatusOK)
 	enc := json.NewEncoder(w)
 

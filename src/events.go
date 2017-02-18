@@ -73,6 +73,7 @@ func ParseTrafficEvents(eventIdsChannel chan<- []uint64, eventsChannel chan<- []
 	defer db.Close()
 
 	var newEventIds []uint64
+	var newItems = make([]Dogodek, 0)
 
 	tx := db.Begin()
 	for _, item := range items {
@@ -87,7 +88,11 @@ func ParseTrafficEvents(eventIdsChannel chan<- []uint64, eventsChannel chan<- []
 			item.CestaEn = itemEn.Cesta
 			item.OpisEn = itemEn.Opis
 			item.VzrokEn = itemEn.Vzrok
+		} else {
+			log.WithFields(log.Fields{"item": item}).Warn("Couldn't find english item!")
 		}
+
+		newItems = append(newItems, item)
 
 		var count int
 		tx.Where("id = ?", item.Id).Model(&Dogodek{}).Count(&count)
@@ -108,5 +113,5 @@ func ParseTrafficEvents(eventIdsChannel chan<- []uint64, eventsChannel chan<- []
 
 	log.WithFields(log.Fields{"num": len(items), "ids": newEventIds}).Info(len(newEventIds), " new events found.")
 	eventIdsChannel <- newEventIds
-	eventsChannel <- items
+	eventsChannel <- newItems
 }

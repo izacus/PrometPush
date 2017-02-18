@@ -51,6 +51,7 @@ func main() {
 	ParseTrafficCameras(camerasChannel)
 	c := cron.New()
 	c.AddFunc("@every 6m", func() { ParseTrafficEvents(eventIdsChannel, eventsChannel) })
+	c.AddFunc("@every 30m", func() { ParseTrafficCameras(camerasChannel) })
 	c.Start()
 
 	// Register HTTP functions

@@ -9,8 +9,8 @@ import (
 )
 
 type Events struct {
-	newEventIds 	[]uint64
-	events			[]Dogodek
+	newEventIds []uint64
+	events      []Dogodek
 }
 
 func getEvents(english bool) ([]Dogodek, error) {
@@ -49,7 +49,7 @@ func getEvents(english bool) ([]Dogodek, error) {
 	return items, nil
 }
 
-func ParseData(eventIdsChannel chan<- []uint64, eventsChannel chan <- []Dogodek) {
+func ParseTrafficEvents(eventIdsChannel chan<- []uint64, eventsChannel chan<- []Dogodek) {
 	items, err := getEvents(false)
 	if err != nil {
 		return

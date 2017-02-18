@@ -46,9 +46,9 @@ func main() {
 	go PushDispatcher(eventIdsChannel, configuration.Push.ApiKey)
 	go ApiService(eventsChannel, router)
 
-	ParseData(eventIdsChannel, eventsChannel)
+	ParseTrafficEvents(eventIdsChannel, eventsChannel)
 	c := cron.New()
-	c.AddFunc("@every 6m", func() { ParseData(eventIdsChannel, eventsChannel) })
+	c.AddFunc("@every 6m", func() { ParseTrafficEvents(eventIdsChannel, eventsChannel) })
 	c.Start()
 
 	// Register HTTP functions

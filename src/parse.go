@@ -8,17 +8,19 @@ import (
 	"github.com/getsentry/raven-go"
 )
 
-func ParseData(eventIdsChannel chan<- []uint64) {
-	var data struct {
-		Contents []struct {
-			Data struct {
-				D []Dogodek `json:"Items"`
-			} `json:"Data"`
-		} `json:"Contents"`
+type Events struct {
+	newEventIds 	[]uint64
+	events			[]Dogodek
+}
+
+func getEvents(english bool) ([]Dogodek, error) {
+	log.Debug("Retrieving traffic data...")
+	url := "http://opendata.si/promet/events/"
+	if english {
+		url = url + "?lang=en"
 	}
 
-	log.Debug("Retrieving traffic data...")
-	response, err := http.Get("http://opendata.si/promet/events/")
+	response, err := http.Get(url)
 	if err != nil {
 		if response != nil {
 			log.WithFields(log.Fields{"status": response.Status, "err": err}).Error("Failed to retrieve data from server.")
@@ -27,16 +29,44 @@ func ParseData(eventIdsChannel chan<- []uint64) {
 		}
 
 		raven.CaptureErrorAndWait(err, nil)
-		return
+		return nil, err
 	}
-	defer response.Body.Close()
 
 	dec := json.NewDecoder(response.Body)
+
+	var data struct {
+		Contents []struct {
+			Data struct {
+				D []Dogodek `json:"Items"`
+			} `json:"Data"`
+		} `json:"Contents"`
+	}
+
 	dec.Decode(&data)
 
 	items := data.Contents[0].Data.D
-	log.WithFields(log.Fields{"status": response.Status, "num": len(items)}).Debug("Data retrieval ok.")
-	log.WithFields(log.Fields{"items": items}).Debug("Items retrieved.")
+	log.WithFields(log.Fields{"status": response.Status, "num": len(items), "english": english}).Debug("Data retrieval ok.")
+	return items, nil
+}
+
+func ParseData(eventIdsChannel chan<- Events) {
+	items, err := getEvents(false)
+	if err != nil {
+		return
+	}
+
+	itemsEn, err := getEvents(true)
+	if err != nil {
+		return
+	}
+
+	log.WithFields(log.Fields{"items": items, "itemsEn": itemsEn}).Debug("Items retrieved.")
+
+	// Make a map of english events
+	itemEnMap := make(map[uint64]Dogodek)
+	for _, item := range itemsEn {
+		itemEnMap[item.Id] = item
+	}
 
 	// Save data to database
 	db := GetDbConnection()
@@ -50,6 +80,14 @@ func ParseData(eventIdsChannel chan<- []uint64) {
 		item.Updated = uint64(item.UpdatedTime.Unix())
 		item.VeljavnostDo = uint64(item.VeljavnostDoTime.Unix())
 		item.VeljavnostOd = uint64(item.VeljavnostOdTime.Unix())
+
+		// Fill in english data if available
+		itemEn, ok := itemEnMap[item.Id]
+		if ok {
+			item.CestaEn = itemEn.Cesta
+			item.OpisEn = itemEn.Opis
+			item.VzrokEn = itemEn.Vzrok
+		}
 
 		var count int
 		tx.Where("id = ?", item.Id).Model(&Dogodek{}).Count(&count)
@@ -69,6 +107,5 @@ func ParseData(eventIdsChannel chan<- []uint64) {
 	tx.Commit()
 
 	log.WithFields(log.Fields{"num": len(items), "ids": newEventIds}).Info(len(newEventIds), " new events found.")
-
-	eventIdsChannel <- newEventIds
+	eventIdsChannel <- Events{newEventIds, items}
 }

@@ -29,18 +29,19 @@ func main() {
 			defer f.Close()
 			log.SetOutput(f)
 			log.SetFormatter(new(log.TextFormatter))
+		} else if os.Args[1] == "--debug" {
+			log.SetLevel(log.DebugLevel)
 		}
 	}
 
 	configuration := getConfiguration()
 	raven.SetDSN(configuration.Push.Dsn)
 
-	eventIdsChannel := make(chan []uint64)
-
-	// Retrieve the starting reference data
-	//ParseData(make(chan []uint64, 1))
+	eventIdsChannel := make(chan Events)
 
 	// Dispatcher processor
+	router := httprouter.New()
+
 	go PushDispatcher(eventIdsChannel, configuration.Push.ApiKey)
 
 	ParseData(eventIdsChannel)
@@ -49,7 +50,6 @@ func main() {
 	c.Start()
 
 	// Register HTTP functions
-	router := httprouter.New()
 	router.POST("/register", RegisterPush)
 	router.POST("/unregister", UnregisterPush)
 	router.GET("/stats", ShowStatistics)

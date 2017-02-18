@@ -15,7 +15,7 @@ type Events struct {
 
 func getEvents(english bool) ([]Dogodek, error) {
 	log.Debug("Retrieving traffic data...")
-	url := "http://opendata.si/promet/events/"
+	url := "https://opendata.si/promet/events/"
 	if english {
 		url = url + "?lang=en"
 	}

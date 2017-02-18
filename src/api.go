@@ -27,23 +27,43 @@ type JsonEvent struct {
 	ValidTo          time.Time `json:"valid_to"`
 }
 
-var currentData []JsonEvent
+type ApiResponse struct {
+	Events		[]JsonEvent	`json:"events"`
+	Cameras		[]Camera	`json:"cameras"`
+}
+
+var currentEvents []JsonEvent
+var currentCameras []Camera
 
 func ShowTrafficData(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	if currentData == nil {
+	if currentEvents == nil || currentCameras == nil {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
+	w.Header()["Content-Type"] = []string{ "application/json" }
 	w.WriteHeader(http.StatusOK)
 	enc := json.NewEncoder(w)
-	enc.Encode(currentData)
+
+	var events []JsonEvent
+	var cameras []Camera
+
+	if currentEvents == nil {
+		events = make([]JsonEvent, 0)
+	} else {
+		events = currentEvents
+	}
+
+	if currentCameras == nil {
+		cameras = make([]Camera, 0)
+	} else {
+		cameras = currentCameras
+	}
+
+	enc.Encode(ApiResponse{events, cameras})
 }
 
-func ApiService(eventsChannel <-chan []Dogodek, router *httprouter.Router) {
-	router.GET("/data", ShowTrafficData)
-	log.Info("API hook registered.")
-
+func eventService(eventsChannel <-chan []Dogodek) {
 	for {
 		events := <-eventsChannel
 		var jsonData = make([]JsonEvent, len(events))
@@ -71,7 +91,22 @@ func ApiService(eventsChannel <-chan []Dogodek, router *httprouter.Router) {
 			jsonData[i] = jsonEvent
 		}
 
-		currentData = jsonData
-		log.WithFields(log.Fields{"data": currentData}).Debug("Updated API data.")
+		currentEvents = jsonData
+		log.WithFields(log.Fields{"data": currentEvents}).Debug("Updated event data.")
 	}
+}
+
+func cameraService(camerasChannel <-chan []Camera) {
+	for {
+		cameras := <-camerasChannel
+		currentCameras = cameras
+		log.WithFields(log.Fields{"data": currentCameras}).Debug("Updated camera data.")
+	}
+}
+
+func ApiService(eventsChannel <-chan []Dogodek, camerasChannel <-chan []Camera, router *httprouter.Router) {
+	router.GET("/data", ShowTrafficData)
+	log.Info("API hook registered.")
+	go eventService(eventsChannel)
+	go cameraService(camerasChannel)
 }

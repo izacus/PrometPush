@@ -6,6 +6,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"net/http"
 	"time"
+	"hash/fnv"
 )
 
 type JsonEvent struct {
@@ -78,8 +79,13 @@ func eventService(eventsChannel <-chan []Dogodek) {
 		var jsonData = make([]JsonEvent, len(events))
 
 		for i, event := range events {
+			// Calculate Id hash
+			algo := fnv.New64a()
+			algo.Write([]byte(event.Id))
+			id_hash := algo.Sum64()
+
 			jsonEvent := JsonEvent{
-				event.Id,
+				id_hash,
 				event.Y_wgs,
 				event.X_wgs,
 				event.Kategorija,

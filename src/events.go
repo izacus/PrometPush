@@ -63,7 +63,7 @@ func getEvents(english bool) ([]Dogodek, error) {
 	return items, nil
 }
 
-func ParseTrafficEvents(eventIdsChannel chan<- []uint64, eventsChannel chan<- []Dogodek) {
+func ParseTrafficEvents(eventIdsChannel chan<- []string, eventsChannel chan<- []Dogodek) {
 	items, err := getEvents(false)
 	if err != nil {
 		return
@@ -77,7 +77,7 @@ func ParseTrafficEvents(eventIdsChannel chan<- []uint64, eventsChannel chan<- []
 	log.WithFields(log.Fields{"items": items, "itemsEn": itemsEn}).Debug("Items retrieved.")
 
 	// Make a map of english events
-	itemEnMap := make(map[uint64]Dogodek)
+	itemEnMap := make(map[string]Dogodek)
 	for _, item := range itemsEn {
 		itemEnMap[item.Id] = item
 	}
@@ -86,7 +86,7 @@ func ParseTrafficEvents(eventIdsChannel chan<- []uint64, eventsChannel chan<- []
 	db := GetDbConnection()
 	defer db.Close()
 
-	var newEventIds []uint64
+	var newEventIds []string
 	var newItems = make([]Dogodek, 0)
 
 	tx := db.Begin()
@@ -112,18 +112,23 @@ func ParseTrafficEvents(eventIdsChannel chan<- []uint64, eventsChannel chan<- []
 		tx.Where("id = ?", item.Id).Model(&Dogodek{}).Count(&count)
 		log.WithFields(log.Fields{"Count": count, "Id": item.Id}).Debug("Checking event.")
 
-		if len(newEventIds) > 0 {
-			continue
-		}
-
 		if count > 0 {
 			continue
 		}
 
-		tx.Create(&item)
+		result := tx.Create(&item)
+		if result.Error != nil {
+			log.WithFields(log.Fields{"err": result.Error}).Error("Failed to create item!")
+			raven.CaptureErrorAndWait(result.Error, nil)
+		}
+
 		newEventIds = append(newEventIds, item.Id)
 	}
-	tx.Commit()
+
+	result := tx.Commit()
+	if result.Error != nil {
+		raven.CaptureErrorAndWait(result.Error, nil)
+	}
 
 	log.WithFields(log.Fields{"num": len(items), "ids": newEventIds}).Info(len(newEventIds), " new events found.")
 	eventIdsChannel <- newEventIds

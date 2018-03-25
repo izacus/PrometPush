@@ -11,6 +11,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/getsentry/raven-go"
 	"github.com/jinzhu/gorm"
+	"hash/fnv"
 )
 
 const GCM_ENDPOINT = "https://android.googleapis.com/gcm/send"
@@ -52,7 +53,7 @@ type PushResponse struct {
 	} `json:"results"`
 }
 
-func PushDispatcher(eventIdsChannel <-chan []uint64, gcmApiKey string) {
+func PushDispatcher(eventIdsChannel <-chan []string, gcmApiKey string) {
 	log.WithField("serverApiKey", gcmApiKey).Debug("Initializing dispatcher.")
 	for {
 		ids := <-eventIdsChannel
@@ -85,7 +86,7 @@ func PushDispatcher(eventIdsChannel <-chan []uint64, gcmApiKey string) {
 	}
 }
 
-func getData(tx *gorm.DB, ids []uint64) []PushEvent {
+func getData(tx *gorm.DB, ids []string) []PushEvent {
 	events := make([]PushEvent, len(ids))
 
 	for i := 0; i < len(ids); i++ {
@@ -106,7 +107,12 @@ func getData(tx *gorm.DB, ids []uint64) []PushEvent {
 			descEn = ""
 		}
 
-		events[i] = PushEvent{Id: event.Id,
+		// Calculate Id hash
+		algo := fnv.New64a()
+		algo.Write([]byte(event.Id))
+		id_hash := algo.Sum64()
+
+		events[i] = PushEvent{Id: id_hash,
 			Cause: event.Vzrok,
 			CauseEn: event.VzrokEn,
 			Road: event.Cesta,

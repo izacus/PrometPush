@@ -19,8 +19,10 @@ type Config struct {
 }
 
 var GitCommit, BuildDate string
+var DebugMode bool
 
 func main() {
+	DebugMode = false
 	log.SetLevel(log.InfoLevel)
 
 	// Set logging to file when running in production
@@ -32,6 +34,7 @@ func main() {
 			log.SetOutput(f)
 			log.SetFormatter(new(log.TextFormatter))
 		} else if os.Args[1] == "--debug" {
+			DebugMode = true
 			log.SetLevel(log.DebugLevel)
 		}
 	}
@@ -50,7 +53,7 @@ func main() {
 		raven.SetRelease(GitCommit)
 	}
 
-	eventIdsChannel := make(chan []uint64)
+	eventIdsChannel := make(chan []string)
 	eventsChannel := make(chan []Dogodek)
 	camerasChannel := make(chan []Camera)
 	pricesChannel := make(chan []GasStationPrice)

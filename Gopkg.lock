@@ -20,6 +20,12 @@
   revision = "7562301a6763c9ac631b0a2011b4aa0e064e45d4"
 
 [[projects]]
+  name = "github.com/go-gormigrate/gormigrate"
+  packages = ["."]
+  revision = "21b0b93e8253d575d9185974835423f98d30158d"
+  version = "v1.2.0"
+
+[[projects]]
   name = "github.com/jinzhu/gorm"
   packages = ["."]
   revision = "6ed508ec6a4ecb3531899a69cbc746ccf65a4166"
@@ -87,6 +93,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "e2cbe0bdb9c27635a84d295bb56ae94a8072ce93eeec84a6e82fdf92a1d0b9f4"
+  inputs-digest = "d031fc81c034acd4733d4dbd503d85f4d84d6bace8dfd02ed8bdf12b41cd549b"
   solver-name = "gps-cdcl"
   solver-version = 1

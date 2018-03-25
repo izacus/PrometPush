@@ -10,7 +10,7 @@ import (
 )
 
 type JsonEvent struct {
-	Id               uint64    `json:"id,string"`
+	Id               int64    `json:"id,string"`
 	Y_wgs            float64   `json:"y_wgs"`
 	X_wgs            float64   `json:"x_wgs"`
 	Category         string    `json:"category"`
@@ -80,9 +80,9 @@ func eventService(eventsChannel <-chan []Dogodek) {
 
 		for i, event := range events {
 			// Calculate Id hash
-			algo := fnv.New64a()
+			algo := fnv.New32a()
 			algo.Write([]byte(event.Id))
-			id_hash := algo.Sum64()
+			id_hash := int64(algo.Sum32())
 
 			jsonEvent := JsonEvent{
 				id_hash,

@@ -18,7 +18,7 @@ const GCM_ENDPOINT = "https://android.googleapis.com/gcm/send"
 const PAGE_SIZE = 1000
 
 type PushEvent struct {
-	Id            uint64  `json:"id"`
+	Id            int64  `json:"id"`
 	Cause         string  `json:"cause"`
 	CauseEn       string  `json:"causeEn"`
 	Road          string  `json:"road"`
@@ -108,9 +108,9 @@ func getData(tx *gorm.DB, ids []string) []PushEvent {
 		}
 
 		// Calculate Id hash
-		algo := fnv.New64a()
+		algo := fnv.New32a()
 		algo.Write([]byte(event.Id))
-		id_hash := algo.Sum64()
+		id_hash := int64(algo.Sum32())
 
 		events[i] = PushEvent{Id: id_hash,
 			Cause: event.Vzrok,

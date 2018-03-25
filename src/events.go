@@ -43,6 +43,10 @@ func getEvents(english bool) ([]Dogodek, error) {
 	}
 
 	dec.Decode(&data)
+	if len(data.Contents) == 0 {
+		log.WithFields(log.Fields{"contents": data.Contents}).Error("Empty contents retrieved!")
+		return nil, err
+	}
 
 	items := data.Contents[0].Data.D
 	log.WithFields(log.Fields{"status": response.Status, "num": len(items), "english": english}).Debug("Data retrieval ok.")

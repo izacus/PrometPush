@@ -18,6 +18,8 @@ type Config struct {
 	}
 }
 
+var GitCommit,BuildDate string
+
 func main() {
 	log.SetLevel(log.InfoLevel)
 
@@ -33,9 +35,20 @@ func main() {
 			log.SetLevel(log.DebugLevel)
 		}
 	}
+	if len(GitCommit) == 0 {
+		GitCommit = "UNKNOWN"
+	}
+	if len(BuildDate) == 0 {
+		BuildDate = "UNKNOWN"
+	}
+
+	log.Infof("PrometPush version %s built on %s", GitCommit, BuildDate)
 
 	configuration := getConfiguration()
 	raven.SetDSN(configuration.Push.Dsn)
+	if GitCommit != "UNKNOWN" {
+		raven.SetRelease(GitCommit)
+	}
 
 	eventIdsChannel := make(chan []uint64)
 	eventsChannel := make(chan []Dogodek)

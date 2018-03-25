@@ -7,7 +7,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/getsentry/raven-go"
 	"github.com/julienschmidt/httprouter"
-	cron "github.com/robfig/cron"
+	"github.com/robfig/cron"
 	"github.com/scalingdata/gcfg"
 )
 
@@ -18,7 +18,7 @@ type Config struct {
 	}
 }
 
-var GitCommit,BuildDate string
+var GitCommit, BuildDate string
 
 func main() {
 	log.SetLevel(log.InfoLevel)

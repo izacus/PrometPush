@@ -20,9 +20,9 @@ type Dogodek struct {
 	OpisEn          string
 	CestaEn         string
 	VzrokEn         string
-	Prioriteta      int32 `json:"Prioriteta"`
-	PrioritetaCeste int32 `json:"PrioritetaCeste"`
-	MejniPrehod     bool  `json:"isMejniPrehod" sql:"default:false"`
+	Prioriteta      int32   `json:"Prioriteta"`
+	PrioritetaCeste int32   `json:"PrioritetaCeste"`
+	MejniPrehod     bool    `json:"isMejniPrehod" sql:"default:false"`
 	Vneseno         uint64
 
 	Updated      uint64

@@ -34,7 +34,7 @@ type PushEvent struct {
 
 type PushPayload struct {
 	RegistrationIds []string `json:"registration_ids"`
-	Data            struct {
+	Data struct {
 		Events []PushEvent `json:"events"`
 	} `json:"data"`
 	TimeToLive uint32 `json:"time_to_live"`
@@ -45,7 +45,7 @@ type PushResponse struct {
 	Success      uint32 `json:"success"`
 	Failure      uint32 `json:"failure"`
 	CanonicalIds uint32 `json:"canonical_ids"`
-	Results      []struct {
+	Results []struct {
 		MessageId      string `json:"message_id"`
 		RegistrationId string `json:"registration_id"`
 		Error          string `json:"error"`
@@ -74,7 +74,7 @@ func PushDispatcher(eventIdsChannel <-chan []uint64, gcmApiKey string) {
 		for page := 0; page < pages; page++ {
 			// Get list of ApiKeys
 			var keys []string
-			tx.Limit(PAGE_SIZE).Offset(page*PAGE_SIZE).Model(&ApiKey{}).Pluck("key", &keys)
+			tx.Limit(PAGE_SIZE).Offset(page * PAGE_SIZE).Model(&ApiKey{}).Pluck("key", &keys)
 			payload := PushPayload{RegistrationIds: keys, TimeToLive: 7200, DryRun: false}
 			payload.Data.Events = data
 			dispatchPayload(tx, payload, gcmApiKey)
@@ -107,18 +107,18 @@ func getData(tx *gorm.DB, ids []uint64) []PushEvent {
 		}
 
 		events[i] = PushEvent{Id: event.Id,
-			Cause:         event.Vzrok,
-			CauseEn:       event.VzrokEn,
-			Road:          event.Cesta,
-			RoadEn:        event.CestaEn,
+			Cause: event.Vzrok,
+			CauseEn: event.VzrokEn,
+			Road: event.Cesta,
+			RoadEn: event.CestaEn,
 			IsBorderXsing: event.MejniPrehod,
-			RoadPriority:  event.PrioritetaCeste,
-			Time:          event.Updated * 1000, // Need to convert to milliseconds
-			Valid:         event.VeljavnostDo * 1000,
-			Description:   desc,
+			RoadPriority: event.PrioritetaCeste,
+			Time: event.Updated * 1000, // Need to convert to milliseconds
+			Valid: event.VeljavnostDo * 1000,
+			Description: desc,
 			DescriptionEn: descEn,
-			Y_wgs:         event.Y_wgs,
-			X_wgs:         event.X_wgs}
+			Y_wgs: event.Y_wgs,
+			X_wgs: event.X_wgs}
 	}
 
 	return events

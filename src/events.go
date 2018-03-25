@@ -6,6 +6,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/getsentry/raven-go"
+	"bytes"
 )
 
 type Events struct {
@@ -42,9 +43,18 @@ func getEvents(english bool) ([]Dogodek, error) {
 		} `json:"Contents"`
 	}
 
-	dec.Decode(&data)
-	if len(data.Contents) == 0 {
-		log.WithFields(log.Fields{"contents": data.Contents}).Error("Empty contents retrieved!")
+	decode_error := dec.Decode(&data)
+	if decode_error != nil || len(data.Contents) == 0 {
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(response.Body)
+
+		if decode_error != nil {
+			raven.CaptureErrorAndWait(decode_error, map[string]string{"response": buf.String()})
+		} else {
+			raven.CaptureMessageAndWait("Invalid response received!", map[string]string{"response": buf.String()})
+		}
+
+		log.Error("Invalid response from server!")
 		return nil, err
 	}
 

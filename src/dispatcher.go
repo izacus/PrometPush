@@ -195,8 +195,12 @@ func processResponse(tx *gorm.DB, registrationIds []string, response PushRespons
 			if response.Results[i].Error == "NotRegistered" || response.Results[i].Error == "InvalidRegistration" {
 				log.WithField("apiKey", registrationIds[i]).Info("Removing not registered push key.")
 				tx.Where("key = ?", registrationIds[i]).Delete(ApiKey{})
+			} else if response.Results[i].Error == "MissingRegistration" {
+				raven.CaptureMessage("Got MissingRegistration", map[string]string{"registrationId": registrationIds[i]})
+				tx.Where("key = ?", registrationIds[i]).Delete(ApiKey{})
 			} else {
 				log.WithFields(log.Fields{"error": response.Results[i].Error}).Warn("Unknown push error.")
+				raven.CaptureMessage("Unknown push error.", map[string]string{"error": response.Results[i].Error, "registrationId": registrationIds[i]})
 			}
 		}
 

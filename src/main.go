@@ -7,7 +7,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/getsentry/raven-go"
 	"github.com/julienschmidt/httprouter"
-	cron "github.com/robfig/cron"
+	"github.com/robfig/cron"
 	"github.com/scalingdata/gcfg"
 )
 
@@ -18,7 +18,11 @@ type Config struct {
 	}
 }
 
+var GitCommit, BuildDate string
+var DebugMode bool
+
 func main() {
+	DebugMode = false
 	log.SetLevel(log.InfoLevel)
 
 	// Set logging to file when running in production
@@ -30,27 +34,42 @@ func main() {
 			log.SetOutput(f)
 			log.SetFormatter(new(log.TextFormatter))
 		} else if os.Args[1] == "--debug" {
+			DebugMode = true
 			log.SetLevel(log.DebugLevel)
 		}
 	}
+	if len(GitCommit) == 0 {
+		GitCommit = "UNKNOWN"
+	}
+	if len(BuildDate) == 0 {
+		BuildDate = "UNKNOWN"
+	}
+
+	log.Infof("PrometPush version %s built on %s", GitCommit, BuildDate)
 
 	configuration := getConfiguration()
 	raven.SetDSN(configuration.Push.Dsn)
+	if GitCommit != "UNKNOWN" {
+		raven.SetRelease(GitCommit)
+	}
 
-	eventIdsChannel := make(chan []uint64)
+	eventIdsChannel := make(chan []string)
 	eventsChannel := make(chan []Dogodek)
 	camerasChannel := make(chan []Camera)
+	pricesChannel := make(chan []GasStationPrice)
 
 	// Dispatcher processor
 	router := httprouter.New()
 
 	go PushDispatcher(eventIdsChannel, configuration.Push.ApiKey)
-	go ApiService(eventsChannel, camerasChannel, router)
+	go ApiService(eventsChannel, camerasChannel, pricesChannel, router)
 
 	ParseTrafficEvents(eventIdsChannel, eventsChannel)
 	ParseTrafficCameras(camerasChannel)
+	ParseFuelPrices(pricesChannel)
 	c := cron.New()
 	c.AddFunc("@every 6m", func() { ParseTrafficEvents(eventIdsChannel, eventsChannel) })
+	c.AddFunc("@every 6m", func() { ParseFuelPrices(pricesChannel) })
 	c.AddFunc("@every 30m", func() { ParseTrafficCameras(camerasChannel) })
 	c.Start()
 

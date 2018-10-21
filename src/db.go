@@ -5,12 +5,13 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/getsentry/raven-go"
+	gomigrate "github.com/go-gormigrate/gormigrate"
 	"github.com/jinzhu/gorm"
 	_ "github.com/lib/pq"
 )
 
 type Dogodek struct {
-	Id              uint64  `json:"Id,string"`
+	Id              string  `json:"Id"`
 	Y_wgs           float64 `json:"y_wgs"`
 	X_wgs           float64 `json:"x_wgs"`
 	Kategorija      string  `json:"Kategorija"`
@@ -64,6 +65,28 @@ func GetDbConnection() *gorm.DB {
 		db.Model(&ApiKey{}).AddUniqueIndex("idx_api_key", "key")
 	}
 
-	db.AutoMigrate(&Dogodek{})
+	result := db.AutoMigrate(&Dogodek{})
+	if result.Error != nil {
+		raven.CaptureErrorAndWait(result.Error, nil)
+		log.WithFields(log.Fields{"err": err}).Error("Failed to migrate database!")
+	}
+
+	migration := gomigrate.New(db, gomigrate.DefaultOptions, []*gomigrate.Migration{
+		{
+			ID: "201803251900",
+			Migrate: func(tx *gorm.DB) error {
+				return tx.Table("dogodek").ModifyColumn("id", "text").AddIndex("idx_event_id", "id").Error
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return tx.RemoveIndex("idx_event_id").Table("dogodek").ModifyColumn("id", "bigint").Error
+			},
+		},
+	})
+
+	if err = migration.Migrate(); err != nil {
+		log.Fatalf("Could not migrate: %v", err)
+		raven.CaptureErrorAndWait(err, nil)
+	}
+
 	return db
 }

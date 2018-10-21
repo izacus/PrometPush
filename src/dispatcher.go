@@ -11,13 +11,14 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/getsentry/raven-go"
 	"github.com/jinzhu/gorm"
+	"hash/fnv"
 )
 
 const GCM_ENDPOINT = "https://android.googleapis.com/gcm/send"
 const PAGE_SIZE = 1000
 
 type PushEvent struct {
-	Id            uint64  `json:"id"`
+	Id            int64  `json:"id"`
 	Cause         string  `json:"cause"`
 	CauseEn       string  `json:"causeEn"`
 	Road          string  `json:"road"`
@@ -34,7 +35,7 @@ type PushEvent struct {
 
 type PushPayload struct {
 	RegistrationIds []string `json:"registration_ids"`
-	Data            struct {
+	Data struct {
 		Events []PushEvent `json:"events"`
 	} `json:"data"`
 	TimeToLive uint32 `json:"time_to_live"`
@@ -45,14 +46,14 @@ type PushResponse struct {
 	Success      uint32 `json:"success"`
 	Failure      uint32 `json:"failure"`
 	CanonicalIds uint32 `json:"canonical_ids"`
-	Results      []struct {
+	Results []struct {
 		MessageId      string `json:"message_id"`
 		RegistrationId string `json:"registration_id"`
 		Error          string `json:"error"`
 	} `json:"results"`
 }
 
-func PushDispatcher(eventIdsChannel <-chan []uint64, gcmApiKey string) {
+func PushDispatcher(eventIdsChannel <-chan []string, gcmApiKey string) {
 	log.WithField("serverApiKey", gcmApiKey).Debug("Initializing dispatcher.")
 	for {
 		ids := <-eventIdsChannel
@@ -74,7 +75,7 @@ func PushDispatcher(eventIdsChannel <-chan []uint64, gcmApiKey string) {
 		for page := 0; page < pages; page++ {
 			// Get list of ApiKeys
 			var keys []string
-			tx.Limit(PAGE_SIZE).Offset(page*PAGE_SIZE).Model(&ApiKey{}).Pluck("key", &keys)
+			tx.Limit(PAGE_SIZE).Offset(page * PAGE_SIZE).Model(&ApiKey{}).Pluck("key", &keys)
 			payload := PushPayload{RegistrationIds: keys, TimeToLive: 7200, DryRun: false}
 			payload.Data.Events = data
 			dispatchPayload(tx, payload, gcmApiKey)
@@ -85,7 +86,7 @@ func PushDispatcher(eventIdsChannel <-chan []uint64, gcmApiKey string) {
 	}
 }
 
-func getData(tx *gorm.DB, ids []uint64) []PushEvent {
+func getData(tx *gorm.DB, ids []string) []PushEvent {
 	events := make([]PushEvent, len(ids))
 
 	for i := 0; i < len(ids); i++ {
@@ -106,19 +107,24 @@ func getData(tx *gorm.DB, ids []uint64) []PushEvent {
 			descEn = ""
 		}
 
-		events[i] = PushEvent{Id: event.Id,
-			Cause:         event.Vzrok,
-			CauseEn:       event.VzrokEn,
-			Road:          event.Cesta,
-			RoadEn:        event.CestaEn,
+		// Calculate Id hash
+		algo := fnv.New32a()
+		algo.Write([]byte(event.Id))
+		id_hash := int64(algo.Sum32())
+
+		events[i] = PushEvent{Id: id_hash,
+			Cause: event.Vzrok,
+			CauseEn: event.VzrokEn,
+			Road: event.Cesta,
+			RoadEn: event.CestaEn,
 			IsBorderXsing: event.MejniPrehod,
-			RoadPriority:  event.PrioritetaCeste,
-			Time:          event.Updated * 1000, // Need to convert to milliseconds
-			Valid:         event.VeljavnostDo * 1000,
-			Description:   desc,
+			RoadPriority: event.PrioritetaCeste,
+			Time: event.Updated * 1000, // Need to convert to milliseconds
+			Valid: event.VeljavnostDo * 1000,
+			Description: desc,
 			DescriptionEn: descEn,
-			Y_wgs:         event.Y_wgs,
-			X_wgs:         event.X_wgs}
+			Y_wgs: event.Y_wgs,
+			X_wgs: event.X_wgs}
 	}
 
 	return events

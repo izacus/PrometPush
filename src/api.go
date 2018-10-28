@@ -2,15 +2,16 @@ package main
 
 import (
 	"encoding/json"
-	log "github.com/Sirupsen/logrus"
-	"github.com/julienschmidt/httprouter"
+	"hash/fnv"
 	"net/http"
 	"time"
-	"hash/fnv"
+
+	log "github.com/Sirupsen/logrus"
+	"github.com/julienschmidt/httprouter"
 )
 
 type JsonEvent struct {
-	Id               int64    `json:"id,string"`
+	Id               int64     `json:"id,string"`
 	Y_wgs            float64   `json:"y_wgs"`
 	X_wgs            float64   `json:"x_wgs"`
 	Category         string    `json:"category"`
@@ -39,6 +40,7 @@ var currentCameras []Camera
 var currentPrices []GasStationPrice
 
 func ShowTrafficData(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	r.Close = true
 	if currentEvents == nil || currentCameras == nil {
 		w.WriteHeader(http.StatusNoContent)
 		return

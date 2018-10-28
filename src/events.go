@@ -1,12 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/getsentry/raven-go"
-	"bytes"
 )
 
 type Events struct {
@@ -109,7 +109,11 @@ func ParseTrafficEvents(eventIdsChannel chan<- []string, eventsChannel chan<- []
 		newItems = append(newItems, item)
 
 		var count int
-		tx.Where("id = ?", item.Id).Model(&Dogodek{}).Count(&count)
+		if err := tx.Where("id = ?", item.Id).Model(&Dogodek{}).Count(&count).Error; err != nil {
+			raven.CaptureErrorAndWait(err, nil)
+			continue
+		}
+
 		log.WithFields(log.Fields{"Count": count, "Id": item.Id}).Debug("Checking event.")
 
 		if count > 0 {

@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
+	"net/http"
+	"time"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/getsentry/raven-go"
 	"github.com/julienschmidt/httprouter"
-	"net/http"
-	"time"
 )
 
 type Statistics struct {
@@ -24,11 +25,14 @@ var stats Statistics
 
 func ShowStatistics(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	raven.SetHttpContext(raven.NewHttp(r))
+	r.Close = true
 	db := GetDbConnection()
+	tx := db.Begin()
+	defer tx.Commit()
 	defer db.Close()
 
 	var count int
-	err := db.Model(&ApiKey{}).Count(&count)
+	err := tx.Model(&ApiKey{}).Count(&count)
 	if err.Error != nil {
 		log.WithFields(log.Fields{"err": err.Error}).Error("Failed to retrieve statistics.")
 		count = -1
@@ -42,7 +46,7 @@ func ShowStatistics(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 	time_today := time.Date(time_now.Year(), time_now.Month(), time_now.Day(),
 		0, 0, 0, 0, time_now.Location())
 
-	err = db.Where("vneseno > ?", time_today.Unix()/1000).Model(&Dogodek{}).Count(&count)
+	err = tx.Where("vneseno > ?", time_today.Unix()/1000).Model(&Dogodek{}).Count(&count)
 	if err.Error != nil {
 		log.WithFields(log.Fields{"err": err.Error}).Error("Failed to retrieve statistics.")
 		count = -1

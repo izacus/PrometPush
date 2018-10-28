@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"math"
 	"net/http"
 	"time"
@@ -11,14 +12,13 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/getsentry/raven-go"
 	"github.com/jinzhu/gorm"
-	"hash/fnv"
 )
 
 const GCM_ENDPOINT = "https://android.googleapis.com/gcm/send"
 const PAGE_SIZE = 1000
 
 type PushEvent struct {
-	Id            int64  `json:"id"`
+	Id            int64   `json:"id"`
 	Cause         string  `json:"cause"`
 	CauseEn       string  `json:"causeEn"`
 	Road          string  `json:"road"`
@@ -35,7 +35,7 @@ type PushEvent struct {
 
 type PushPayload struct {
 	RegistrationIds []string `json:"registration_ids"`
-	Data struct {
+	Data            struct {
 		Events []PushEvent `json:"events"`
 	} `json:"data"`
 	TimeToLive uint32 `json:"time_to_live"`
@@ -46,7 +46,7 @@ type PushResponse struct {
 	Success      uint32 `json:"success"`
 	Failure      uint32 `json:"failure"`
 	CanonicalIds uint32 `json:"canonical_ids"`
-	Results []struct {
+	Results      []struct {
 		MessageId      string `json:"message_id"`
 		RegistrationId string `json:"registration_id"`
 		Error          string `json:"error"`
@@ -64,9 +64,15 @@ func PushDispatcher(eventIdsChannel <-chan []string, gcmApiKey string) {
 
 		// Paginate apikeys on a page boundary due to GCM server limit
 		db := GetDbConnection()
+		defer db.Close()
 		tx := db.Begin()
 
 		data := getData(tx, ids)
+		if data == nil {
+			log.Error("Failed to retrieve data for passed ids")
+			tx.Rollback()
+			return
+		}
 
 		var keyCount int
 		tx.Model(&ApiKey{}).Count(&keyCount)
@@ -75,14 +81,13 @@ func PushDispatcher(eventIdsChannel <-chan []string, gcmApiKey string) {
 		for page := 0; page < pages; page++ {
 			// Get list of ApiKeys
 			var keys []string
-			tx.Limit(PAGE_SIZE).Offset(page * PAGE_SIZE).Model(&ApiKey{}).Pluck("key", &keys)
+			tx.Limit(PAGE_SIZE).Offset(page*PAGE_SIZE).Model(&ApiKey{}).Pluck("key", &keys)
 			payload := PushPayload{RegistrationIds: keys, TimeToLive: 7200, DryRun: false}
 			payload.Data.Events = data
 			dispatchPayload(tx, payload, gcmApiKey)
 		}
 
 		tx.Commit()
-		db.Close()
 	}
 }
 
@@ -91,7 +96,11 @@ func getData(tx *gorm.DB, ids []string) []PushEvent {
 
 	for i := 0; i < len(ids); i++ {
 		var event Dogodek
-		tx.First(&event, ids[i])
+		if err := tx.First(&event, "id = ?", ids[i]).Error; err != nil {
+			log.WithFields(log.Fields{"id": ids[i]}).Error("Failed to retrieve event data for dispatch")
+			raven.CaptureErrorAndWait(err, nil)
+			return nil
+		}
 
 		var desc string
 		var descEn string
@@ -113,18 +122,18 @@ func getData(tx *gorm.DB, ids []string) []PushEvent {
 		id_hash := int64(algo.Sum32())
 
 		events[i] = PushEvent{Id: id_hash,
-			Cause: event.Vzrok,
-			CauseEn: event.VzrokEn,
-			Road: event.Cesta,
-			RoadEn: event.CestaEn,
+			Cause:         event.Vzrok,
+			CauseEn:       event.VzrokEn,
+			Road:          event.Cesta,
+			RoadEn:        event.CestaEn,
 			IsBorderXsing: event.MejniPrehod,
-			RoadPriority: event.PrioritetaCeste,
-			Time: event.Updated * 1000, // Need to convert to milliseconds
-			Valid: event.VeljavnostDo * 1000,
-			Description: desc,
+			RoadPriority:  event.PrioritetaCeste,
+			Time:          event.Updated * 1000, // Need to convert to milliseconds
+			Valid:         event.VeljavnostDo * 1000,
+			Description:   desc,
 			DescriptionEn: descEn,
-			Y_wgs: event.Y_wgs,
-			X_wgs: event.X_wgs}
+			Y_wgs:         event.Y_wgs,
+			X_wgs:         event.X_wgs}
 	}
 
 	return events
@@ -200,10 +209,14 @@ func processResponse(tx *gorm.DB, registrationIds []string, response PushRespons
 		if len(response.Results[i].Error) > 0 {
 			if response.Results[i].Error == "NotRegistered" || response.Results[i].Error == "InvalidRegistration" {
 				log.WithField("apiKey", registrationIds[i]).Info("Removing not registered push key.")
-				tx.Where("key = ?", registrationIds[i]).Delete(ApiKey{})
+				if err := tx.Where("key = ?", registrationIds[i]).Delete(ApiKey{}).Error; err != nil {
+					raven.CaptureErrorAndWait(err, nil)
+				}
 			} else if response.Results[i].Error == "MissingRegistration" {
 				raven.CaptureMessage("Got MissingRegistration", map[string]string{"registrationId": registrationIds[i]})
-				tx.Where("key = ?", registrationIds[i]).Delete(ApiKey{})
+				if err := tx.Where("key = ?", registrationIds[i]).Delete(ApiKey{}).Error; err != nil {
+					raven.CaptureErrorAndWait(err, nil)
+				}
 			} else {
 				log.WithFields(log.Fields{"error": response.Results[i].Error}).Warn("Unknown push error.")
 				raven.CaptureMessage("Unknown push error.", map[string]string{"error": response.Results[i].Error, "registrationId": registrationIds[i]})
@@ -212,13 +225,19 @@ func processResponse(tx *gorm.DB, registrationIds []string, response PushRespons
 
 		if len(response.Results[i].RegistrationId) > 0 {
 			// Replace our push key with a new one
-			tx.Where("key = ?", registrationIds[i]).Delete(ApiKey{})
+			if err := tx.Where("key = ?", registrationIds[i]).Delete(ApiKey{}).Error; err != nil {
+				raven.CaptureErrorAndWait(err, nil)
+			}
 
 			key := ApiKey{Key: response.Results[i].RegistrationId, RegistrationTime: time.Now().Unix(), UserAgent: "From Google"}
-			tx.Where("key = ?", response.Results[i].RegistrationId).FirstOrInit(&key)
+			if err := tx.Where("key = ?", response.Results[i].RegistrationId).FirstOrInit(&key).Error; err != nil {
+				raven.CaptureErrorAndWait(err, nil)
+			}
 
 			if tx.NewRecord(key) {
-				tx.Save(key)
+				if err := tx.Save(key).Error; err != nil {
+					raven.CaptureErrorAndWait(err, nil)
+				}
 			}
 
 			GetStatistics().UpdatedPushKeys++

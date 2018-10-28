@@ -1,3 +1,6 @@
+[db]
+dbname=promet_push
+
 [push]
 apiKey=APIKEY_HERE
 dsn=SENTRY_DSN_HERE

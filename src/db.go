@@ -43,7 +43,7 @@ type ApiKey struct {
 }
 
 func GetDbConnection() *gorm.DB {
-	db, err := gorm.Open("postgres", "dbname=promet sslmode=disable")
+	db, err := gorm.Open("postgres", "dbname=promet_push sslmode=disable")
 	if err != nil {
 		raven.CaptureErrorAndWait(err, nil)
 		log.WithFields(log.Fields{"err": err}).Error("Failed to connect to database.")

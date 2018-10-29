@@ -71,17 +71,33 @@ func UnregisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 	// Check if key already exists
 	db := GetDbConnection()
 	defer db.Close()
-	query := db.Where("key = ?", apiKeyStr).Delete(ApiKey{})
-	if query.Error != nil {
-		raven.CaptureErrorAndWait(query.Error, nil)
-		log.WithFields(log.Fields{"err": query.Error, "apiKey": apiKeyStr, "ua": r.UserAgent()}).Error("Failed to unregister api api key!")
-		returnError(w)
+
+	tx := db.Begin()
+	var count int
+	if err := tx.Where("key = ?", apiKeyStr).Model(&ApiKey{}).Count(&count).Error; err != nil {
+		raven.CaptureErrorAndWait(err, nil)
+		log.WithFields(log.Fields{"err": err, "apiKey": apiKeyStr, "ua": r.UserAgent()}).Error("Failed to check for API key!")
+		tx.Rollback()
 		return
 	}
 
-	log.WithFields(log.Fields{"apiKey": apiKeyStr, "ua": r.UserAgent()}).Info("Removed API key registration.")
-	GetStatistics().DeviceUnregistrations++
+	if count > 0 {
+		query := tx.Where("key = ?", apiKeyStr).Delete(ApiKey{})
+		if query.Error != nil {
+			raven.CaptureErrorAndWait(query.Error, nil)
+			log.WithFields(log.Fields{"err": query.Error, "apiKey": apiKeyStr, "ua": r.UserAgent()}).Error("Failed to unregister api api key!")
+			returnError(w)
+			return
+		}
 
+		log.WithFields(log.Fields{"apiKey": apiKeyStr, "ua": r.UserAgent()}).Info("Removed API key registration.")
+		GetStatistics().DeviceUnregistrations++
+	} else {
+		log.WithFields(log.Fields{"apiKey": apiKeyStr, "ua": r.UserAgent()}).Info("API key for removal not found.")
+		GetStatistics().DeviceUnregistrationsInvalid++
+	}
+
+	tx.Commit()
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))
 }

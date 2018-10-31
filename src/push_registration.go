@@ -87,6 +87,7 @@ func UnregisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 			raven.CaptureErrorAndWait(query.Error, nil)
 			log.WithFields(log.Fields{"err": query.Error, "apiKey": apiKeyStr, "ua": r.UserAgent()}).Error("Failed to unregister api api key!")
 			returnError(w)
+			tx.Rollback()
 			return
 		}
 

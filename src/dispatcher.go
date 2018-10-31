@@ -66,6 +66,7 @@ func PushDispatcher(eventIdsChannel <-chan []string, gcmApiKey string) {
 		db := GetDbConnection()
 		defer db.Close()
 		tx := db.Begin()
+		defer tx.Commit()
 
 		data := getData(tx, ids)
 		if data == nil {
@@ -86,8 +87,6 @@ func PushDispatcher(eventIdsChannel <-chan []string, gcmApiKey string) {
 			payload.Data.Events = data
 			dispatchPayload(tx, payload, gcmApiKey)
 		}
-
-		tx.Commit()
 	}
 }
 

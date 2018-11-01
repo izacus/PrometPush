@@ -55,6 +55,9 @@ type PushResponse struct {
 
 func PushDispatcher(eventIdsChannel <-chan []string, gcmApiKey string) {
 	log.WithField("serverApiKey", gcmApiKey).Debug("Initializing dispatcher.")
+
+	// Paginate apikeys on a page boundary due to GCM server limit
+	db := GetDbConnection()
 	for {
 		ids := <-eventIdsChannel
 		log.WithField("ids", ids).Debug("New ids received.")
@@ -62,12 +65,7 @@ func PushDispatcher(eventIdsChannel <-chan []string, gcmApiKey string) {
 			continue
 		}
 
-		// Paginate apikeys on a page boundary due to GCM server limit
-		db := GetDbConnection()
-		defer db.Close()
 		tx := db.Begin()
-		defer tx.Commit()
-
 		data := getData(tx, ids)
 		if data == nil {
 			log.Error("Failed to retrieve data for passed ids")
@@ -76,17 +74,30 @@ func PushDispatcher(eventIdsChannel <-chan []string, gcmApiKey string) {
 		}
 
 		var keyCount int
-		tx.Model(&ApiKey{}).Count(&keyCount)
+		if err := tx.Model(&ApiKey{}).Count(&keyCount).Error; err != nil {
+			log.WithField("error", err).Error("Failed to check existence of an event.")
+			raven.CaptureErrorAndWait(err, nil)
+			continue
+		}
+
 		pages := int(math.Ceil(float64(keyCount) / float64(PAGE_SIZE)))
 
 		for page := 0; page < pages; page++ {
 			// Get list of ApiKeys
 			var keys []string
-			tx.Limit(PAGE_SIZE).Offset(page*PAGE_SIZE).Model(&ApiKey{}).Pluck("key", &keys)
+			if err := tx.Limit(PAGE_SIZE).Offset(page*PAGE_SIZE).Model(&ApiKey{}).Pluck("key", &keys).Error; err != nil {
+				log.WithField("error", err).Error("Failed load device tokens")
+				raven.CaptureErrorAndWait(err, nil)
+				continue
+			}
+
+			log.WithField("num", len(keys)).Info("Dispatching payload...")
 			payload := PushPayload{RegistrationIds: keys, TimeToLive: 7200, DryRun: false}
 			payload.Data.Events = data
 			dispatchPayload(tx, payload, gcmApiKey)
 		}
+
+		tx.Commit()
 	}
 }
 

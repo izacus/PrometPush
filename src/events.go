@@ -84,7 +84,6 @@ func ParseTrafficEvents(eventIdsChannel chan<- []string, eventsChannel chan<- []
 
 	// Save data to database
 	db := GetDbConnection()
-	defer db.Close()
 
 	var newEventIds []string
 	var newItems = make([]Dogodek, 0)

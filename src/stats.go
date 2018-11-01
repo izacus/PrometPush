@@ -28,7 +28,6 @@ func ShowStatistics(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 	raven.SetHttpContext(raven.NewHttp(r))
 	r.Close = true
 	db := GetDbConnection()
-	defer db.Close()
 	tx := db.Begin()
 	defer tx.Commit()
 

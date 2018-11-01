@@ -23,7 +23,6 @@ func RegisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 
 	// Check if key already exists
 	db := GetDbConnection()
-	defer db.Close()
 
 	tx := db.Begin()
 	// Check for existing registration
@@ -70,7 +69,6 @@ func UnregisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 
 	// Check if key already exists
 	db := GetDbConnection()
-	defer db.Close()
 
 	tx := db.Begin()
 	var count int

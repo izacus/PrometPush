@@ -29,7 +29,11 @@ func main() {
 	if len(os.Args) > 1 {
 		if os.Args[1] == "--production" {
 			os.Mkdir("log", 0755)
-			f, _ := os.Create("log/promet_push.log")
+			f, err := os.OpenFile("log/promet_push.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				raven.CaptureErrorAndWait(err, nil)
+				log.WithField("error", err).Error("Failed to open log file")
+			}
 			defer f.Close()
 			log.SetOutput(f)
 			log.SetFormatter(new(log.TextFormatter))
@@ -52,6 +56,14 @@ func main() {
 	if GitCommit != "UNKNOWN" {
 		raven.SetRelease(GitCommit)
 	}
+
+	if err := InitializeDbConnection(); err != nil {
+		raven.CaptureErrorAndWait(err, nil)
+		panic("Failed to connect to database")
+	}
+
+	db := GetDbConnection()
+	defer db.Close()
 
 	eventIdsChannel := make(chan []string)
 	eventsChannel := make(chan []Dogodek)

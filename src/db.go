@@ -42,8 +42,11 @@ type ApiKey struct {
 	UserAgent        string
 }
 
-func GetDbConnection() *gorm.DB {
-	db, err := gorm.Open("postgres", "dbname=promet_push sslmode=disable")
+var db *gorm.DB
+
+func InitializeDbConnection() error {
+	var err error
+	db, err = gorm.Open("postgres", "dbname=promet_push sslmode=disable")
 	if err != nil {
 		raven.CaptureErrorAndWait(err, nil)
 		log.WithFields(log.Fields{"err": err}).Error("Failed to connect to database.")
@@ -57,6 +60,8 @@ func GetDbConnection() *gorm.DB {
 		panic("Could not connect to database!")
 	}
 
+	db.DB().SetMaxIdleConns(10)
+
 	db.LogMode(false)
 	db.SingularTable(true)
 
@@ -69,6 +74,7 @@ func GetDbConnection() *gorm.DB {
 	if result.Error != nil {
 		raven.CaptureErrorAndWait(result.Error, nil)
 		log.WithFields(log.Fields{"err": err}).Error("Failed to migrate database!")
+		return result.Error
 	}
 
 	migration := gomigrate.New(db, gomigrate.DefaultOptions, []*gomigrate.Migration{
@@ -88,5 +94,9 @@ func GetDbConnection() *gorm.DB {
 		raven.CaptureErrorAndWait(err, nil)
 	}
 
+	return nil
+}
+
+func GetDbConnection() *gorm.DB {
 	return db
 }

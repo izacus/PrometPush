@@ -52,7 +52,10 @@ func main() {
 	log.Infof("PrometPush version %s built on %s", GitCommit, BuildDate)
 
 	configuration := getConfiguration()
-	raven.SetDSN(configuration.Push.Dsn)
+	if (!DebugMode) {
+		raven.SetDSN(configuration.Push.Dsn)
+	}
+
 	if GitCommit != "UNKNOWN" {
 		raven.SetRelease(GitCommit)
 	}

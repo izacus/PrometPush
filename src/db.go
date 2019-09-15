@@ -5,6 +5,7 @@ import (
 
 	"github.com/getsentry/raven-go"
 	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	_ "github.com/lib/pq"
 	log "github.com/sirupsen/logrus"
 	gomigrate "gopkg.in/gormigrate.v1"
@@ -46,7 +47,13 @@ var db *gorm.DB
 
 func InitializeDbConnection() error {
 	var err error
-	db, err = gorm.Open("postgres", "dbname=promet_push sslmode=disable")
+
+	if (DebugMode) {
+		db, err = gorm.Open("sqlite3", "debug.db")
+	} else {
+		db, err = gorm.Open("postgres", "dbname=promet_push sslmode=disable")
+	}
+
 	if err != nil {
 		raven.CaptureErrorAndWait(err, nil)
 		log.WithFields(log.Fields{"err": err}).Error("Failed to connect to database.")
@@ -62,7 +69,7 @@ func InitializeDbConnection() error {
 
 	db.DB().SetMaxIdleConns(10)
 
-	db.LogMode(false)
+	db.LogMode(DebugMode)
 	db.SingularTable(true)
 
 	if (!db.HasTable(&ApiKey{})) {
@@ -75,6 +82,11 @@ func InitializeDbConnection() error {
 		raven.CaptureErrorAndWait(result.Error, nil)
 		log.WithFields(log.Fields{"err": err}).Error("Failed to migrate database!")
 		return result.Error
+	}
+
+	// We don't run migrations on SQLite3
+	if (DebugMode) {
+		return nil
 	}
 
 	migration := gomigrate.New(db, gomigrate.DefaultOptions, []*gomigrate.Migration{

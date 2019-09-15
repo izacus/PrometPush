@@ -76,6 +76,8 @@ func PushDispatcher(eventIdsChannel <-chan []string, firebaseConfigurationJsonFi
 			return
 		}
 
+		dispatchPayloadToTopic(data, client, ctx)
+
 		var keyCount int
 		if err := tx.Model(&ApiKey{}).Count(&keyCount).Error; err != nil {
 			log.WithField("error", err).Error("Failed to check existence of an event.")
@@ -156,6 +158,56 @@ func getData(tx *gorm.DB, ids []string) []PushEvent {
 	return events
 }
 
+func dispatchPayloadToTopic(events []PushEvent, client *messaging.Client, ctx context.Context) {
+	log.Debug("Dispatching to topics...")
+	var json_data bytes.Buffer
+	if err := json.NewEncoder(&json_data).Encode(events); err != nil {
+		log.WithField("error", err).Error("Failed to encode JSON payload for dispatch.")
+		raven.CaptureErrorAndWait(err, nil)
+		return
+	}
+
+	var ttl = time.Duration(2) * time.Hour
+	message := &messaging.Message{
+		Data:         map[string]string {
+			"events": json_data.String(),
+		},
+		Topic: "allRoadEvents",
+		Android: &messaging.AndroidConfig{
+			TTL: &ttl,
+		},
+	}
+
+	retryCount := 5
+	retrySecs := 10
+
+	var err error
+	for {
+		if (DebugMode) {
+			_, err = client.SendDryRun(ctx, message)
+		} else {
+			_, err = client.Send(ctx, message)
+		}
+
+		if err == nil {
+			break
+		}
+
+		if retryCount <= 0 {
+			break
+		}
+
+		log.WithFields(log.Fields{"err": err, "data": json_data}).Error("Failed to send topic package.")
+		raven.CaptureErrorAndWait(err, nil)
+
+		time.Sleep(time.Duration(retrySecs) * time.Second)
+		retryCount = retryCount - 1
+		retrySecs = retrySecs * 2
+	}
+
+	log.Info("Topic dispatch OK.")
+}
+
 func dispatchPayload(tx *gorm.DB, payload PushPayload, client *messaging.Client, ctx context.Context) {
 	log.Debug("Dispatching...")
 
@@ -189,7 +241,7 @@ func dispatchPayload(tx *gorm.DB, payload PushPayload, client *messaging.Client,
 	for {
 
 		if (DebugMode) {
-			response, err = client.SendMulticast(ctx, message)
+			response, err = client.SendMulticastDryRun(ctx, message)
 		} else {
 			response, err = client.SendMulticast(ctx, message)
 		}
@@ -203,7 +255,7 @@ func dispatchPayload(tx *gorm.DB, payload PushPayload, client *messaging.Client,
 			break
 		}
 
-		log.WithFields(log.Fields{"err": err, "data": json_data}).Error("Failed to send GCM package.")
+		log.WithFields(log.Fields{"err": err, "data": json_data.String()}).Error("Failed to send GCM package.")
 		GetStatistics().FailedDispatches++
 		raven.CaptureErrorAndWait(err, nil)
 
@@ -214,27 +266,6 @@ func dispatchPayload(tx *gorm.DB, payload PushPayload, client *messaging.Client,
 
 	log.WithFields(log.Fields{"success": response.SuccessCount, "failure": response.FailureCount}).Info("Dispatch OK.")
 	processResponse(tx, payload.RegistrationIds, response)
-
-	// Try sending to topic too
-	topicMessage := &messaging.Message{
-		Data: map[string]string{
-			"events": json_data.String(),
-		},
-		Topic: "allRoadEvents",
-	}
-
-	if (DebugMode) {
-		_, err = client.SendDryRun(ctx, topicMessage)
-	} else {
-		_, err = client.Send(ctx, topicMessage)
-	}
-
-	if err != nil {
-		log.WithFields(log.Fields{"err": err, "len": json_data.Len() }).Error("Failed to send GCM package.")
-	} else {
-		log.Info("Topic dispatch all OK.")
-	}
-
 }
 
 func processResponse(tx *gorm.DB, registrationIds []string, response *messaging.BatchResponse) {

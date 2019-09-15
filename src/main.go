@@ -4,11 +4,11 @@ import (
 	"net/http"
 	"os"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/getsentry/raven-go"
 	"github.com/julienschmidt/httprouter"
 	"github.com/robfig/cron"
 	"github.com/scalingdata/gcfg"
+	log "github.com/sirupsen/logrus"
 )
 
 type Config struct {

@@ -9,9 +9,9 @@ import (
 	"net/http"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/getsentry/raven-go"
 	"github.com/jinzhu/gorm"
+	log "github.com/sirupsen/logrus"
 )
 
 const GCM_ENDPOINT = "https://android.googleapis.com/gcm/send"

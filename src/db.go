@@ -3,11 +3,11 @@ package main
 import (
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/getsentry/raven-go"
-	gomigrate "github.com/go-gormigrate/gormigrate"
 	"github.com/jinzhu/gorm"
 	_ "github.com/lib/pq"
+	log "github.com/sirupsen/logrus"
+	gomigrate "gopkg.in/gormigrate.v1"
 )
 
 type Dogodek struct {

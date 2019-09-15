@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/getsentry/raven-go"
 	"github.com/julienschmidt/httprouter"
+	log "github.com/sirupsen/logrus"
 )
 
 func RegisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {

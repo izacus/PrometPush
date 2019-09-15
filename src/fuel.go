@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/json"
-	log "github.com/Sirupsen/logrus"
 	"github.com/getsentry/raven-go"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 )
 
@@ -23,9 +23,9 @@ type GasPrice struct {
 
 // Upstream JSON structure
 type JsonGasStationPrice struct {
-	Key     string `json:"key"`
-	Name    string `json:"name"`
-	Address string `json:"address"`
+	Key      string `json:"key"`
+	Name     string `json:"name"`
+	Address  string `json:"address"`
 	Location struct {
 		Coordinates []float64 `json:"coordinates"`
 	} `json:"loc"`

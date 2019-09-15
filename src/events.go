@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/getsentry/raven-go"
+	log "github.com/sirupsen/logrus"
 )
 
 type Events struct {

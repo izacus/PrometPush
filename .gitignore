@@ -4,3 +4,6 @@ log/
 *.db
 promet_push
 vendor/
+build/
+.vscode/
+.idea/

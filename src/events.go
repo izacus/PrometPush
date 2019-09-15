@@ -115,7 +115,7 @@ func ParseTrafficEvents(eventIdsChannel chan<- []string, eventsChannel chan<- []
 
 		log.WithFields(log.Fields{"Count": count, "Id": item.Id}).Debug("Checking event.")
 
-		if count > 0 {
+		if !DebugMode && count > 0 {
 			continue
 		}
 

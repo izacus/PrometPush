@@ -2,20 +2,22 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
-	"fmt"
+	firebase "firebase.google.com/go"
+	"firebase.google.com/go/messaging"
+	"google.golang.org/api/option"
 	"hash/fnv"
 	"math"
-	"net/http"
 	"time"
 
+	_ "firebase.google.com/go"
 	"github.com/getsentry/raven-go"
 	"github.com/jinzhu/gorm"
 	log "github.com/sirupsen/logrus"
 )
 
-const GCM_ENDPOINT = "https://android.googleapis.com/gcm/send"
-const PAGE_SIZE = 1000
+const PAGE_SIZE = 99
 
 type PushEvent struct {
 	Id            int64   `json:"id"`
@@ -34,30 +36,31 @@ type PushEvent struct {
 }
 
 type PushPayload struct {
-	RegistrationIds []string `json:"registration_ids"`
-	Data            struct {
-		Events []PushEvent `json:"events"`
-	} `json:"data"`
-	TimeToLive uint32 `json:"time_to_live"`
-	DryRun     bool   `json:"dry_run"`
+	RegistrationIds []string
+	Events []PushEvent
 }
 
-type PushResponse struct {
-	Success      uint32 `json:"success"`
-	Failure      uint32 `json:"failure"`
-	CanonicalIds uint32 `json:"canonical_ids"`
-	Results      []struct {
-		MessageId      string `json:"message_id"`
-		RegistrationId string `json:"registration_id"`
-		Error          string `json:"error"`
-	} `json:"results"`
-}
-
-func PushDispatcher(eventIdsChannel <-chan []string, gcmApiKey string) {
-	log.WithField("serverApiKey", gcmApiKey).Debug("Initializing dispatcher.")
+func PushDispatcher(eventIdsChannel <-chan []string, firebaseConfigurationJsonFile string) {
+	log.WithField("serverApiKey", firebaseConfigurationJsonFile).Debug("Initializing dispatcher.")
 
 	// Paginate apikeys on a page boundary due to GCM server limit
 	db := GetDbConnection()
+
+	opt := option.WithCredentialsFile(firebaseConfigurationJsonFile)
+	ctx := context.Background()
+
+	var app *firebase.App
+	var client *messaging.Client
+	var err error
+
+	if app, err = firebase.NewApp(ctx, nil, opt); err != nil {
+		log.WithField("error", err).Fatal("Failed to initialize firebase SDK.")
+	}
+
+	if client, err = app.Messaging(ctx); err != nil {
+		log.WithField("error", err).Fatal("Failed to initialize firebase client.");
+	}
+
 	for {
 		ids := <-eventIdsChannel
 		log.WithField("ids", ids).Debug("New ids received.")
@@ -92,9 +95,9 @@ func PushDispatcher(eventIdsChannel <-chan []string, gcmApiKey string) {
 			}
 
 			log.WithField("num", len(keys)).Info("Dispatching payload...")
-			payload := PushPayload{RegistrationIds: keys, TimeToLive: 7200, DryRun: false}
-			payload.Data.Events = data
-			dispatchPayload(tx, payload, gcmApiKey)
+			payload := PushPayload{RegistrationIds: keys}
+			payload.Events = data
+			dispatchPayload(tx, payload, client, ctx)
 		}
 
 		tx.Commit()
@@ -102,8 +105,12 @@ func PushDispatcher(eventIdsChannel <-chan []string, gcmApiKey string) {
 }
 
 func getData(tx *gorm.DB, ids []string) []PushEvent {
-	events := make([]PushEvent, len(ids))
+	// There's a payload limit on FCM so we need to make sure we don't send too many.
+	if len(ids) > 10 {
+		ids = ids[len(ids) - 10:]
+	}
 
+	events := make([]PushEvent, len(ids))
 	for i := 0; i < len(ids); i++ {
 		var event Dogodek
 		if err := tx.First(&event, "id = ?", ids[i]).Error; err != nil {
@@ -149,109 +156,105 @@ func getData(tx *gorm.DB, ids []string) []PushEvent {
 	return events
 }
 
-func dispatchPayload(tx *gorm.DB, payload PushPayload, gcmApiKey string) error {
+func dispatchPayload(tx *gorm.DB, payload PushPayload, client *messaging.Client, ctx context.Context) {
 	log.Debug("Dispatching...")
 
 	var json_data bytes.Buffer
-	json.NewEncoder(&json_data).Encode(payload)
+	if err := json.NewEncoder(&json_data).Encode(payload.Events); err != nil {
+		log.WithField("error", err).Error("Failed to encode JSON payload for dispatch.")
+		raven.CaptureErrorAndWait(err, nil)
+		return
+	}
+
 	log.WithField("payload", json_data.String()).Debug("Dispatching pushes.")
 
-	request, _ := http.NewRequest("POST", GCM_ENDPOINT, &json_data)
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Authorization", fmt.Sprintf("key=%s", gcmApiKey))
-
-	client := &http.Client{}
+	var ttl = time.Duration(2) * time.Hour
+	message := &messaging.MulticastMessage{
+		Data: map[string]string{
+			"events": json_data.String(),
+		},
+		Tokens:  payload.RegistrationIds,
+		Android: &messaging.AndroidConfig{
+			TTL: &ttl,
+		},
+	}
 
 	// Set payload with exponential backoff
 	retryCount := 5
 	retrySecs := 10
 
-	var response *http.Response
 	var err error
+	var response *messaging.BatchResponse
 
 	for {
-		response, err = client.Do(request)
-		GetStatistics().Dispatches++
-		if response.StatusCode > 499 && response.StatusCode < 600 {
-			time.Sleep(time.Duration(retrySecs) * time.Second)
-			retryCount = retryCount - 1
-			retrySecs = retrySecs * 2
 
-			raven.CaptureMessage(response.Status, nil)
-			GetStatistics().FailedDispatches++
+		if (DebugMode) {
+			response, err = client.SendMulticast(ctx, message)
+		} else {
+			response, err = client.SendMulticast(ctx, message)
+		}
+
+		GetStatistics().Dispatches++
+		if err == nil {
+			break
+		}
+
+		if retryCount <= 0 {
+			break
+		}
+
+		log.WithFields(log.Fields{"err": err, "data": json_data}).Error("Failed to send GCM package.")
+		GetStatistics().FailedDispatches++
+		raven.CaptureErrorAndWait(err, nil)
+
+		time.Sleep(time.Duration(retrySecs) * time.Second)
+		retryCount = retryCount - 1
+		retrySecs = retrySecs * 2
+	}
+
+	log.WithFields(log.Fields{"success": response.SuccessCount, "failure": response.FailureCount}).Info("Dispatch OK.")
+	processResponse(tx, payload.RegistrationIds, response)
+
+	// Try sending to topic too
+	topicMessage := &messaging.Message{
+		Data: map[string]string{
+			"events": json_data.String(),
+		},
+		Topic: "allRoadEvents",
+	}
+
+	if (DebugMode) {
+		_, err = client.SendDryRun(ctx, topicMessage)
+	} else {
+		_, err = client.Send(ctx, topicMessage)
+	}
+
+	if err != nil {
+		log.WithFields(log.Fields{"err": err, "len": json_data.Len() }).Error("Failed to send GCM package.")
+	} else {
+		log.Info("Topic dispatch all OK.")
+	}
+
+}
+
+func processResponse(tx *gorm.DB, registrationIds []string, response *messaging.BatchResponse) {
+	if response.FailureCount == 0 {
+		return
+	}
+
+	for i, singleResponse := range response.Responses {
+		if singleResponse.Success {
 			continue
 		}
 
-		if err != nil {
-			log.WithFields(log.Fields{"err": err, "data": json_data}).Error("Failed to send GCM package.")
-			GetStatistics().FailedDispatches++
-			raven.CaptureErrorAndWait(err, nil)
-			return err
-		}
-
-		if response.StatusCode > 399 && response.StatusCode < 500 {
-			GetStatistics().FailedDispatches++
-			log.WithFields(log.Fields{"response": response.Status}).Error("Failed to dispatch notifications!")
-			raven.CaptureMessage(response.Status, nil)
-			return err
-		}
-
-		if err == nil || retryCount <= 0 {
-			break
-		}
-	}
-
-	var pushResponse PushResponse
-	defer response.Body.Close()
-	dec := json.NewDecoder(response.Body)
-	dec.Decode(&pushResponse)
-
-	log.WithFields(log.Fields{"status": response.Status, "r": pushResponse}).Info("Dispatch OK.")
-	processResponse(tx, payload.RegistrationIds, pushResponse)
-
-	return nil
-}
-
-func processResponse(tx *gorm.DB, registrationIds []string, response PushResponse) {
-
-	// Process canonical IDs and non-registered clients
-	for i := 0; i < len(registrationIds); i++ {
-		if len(response.Results[i].Error) > 0 {
-			if response.Results[i].Error == "NotRegistered" || response.Results[i].Error == "InvalidRegistration" {
-				log.WithField("apiKey", registrationIds[i]).Info("Removing not registered push key.")
-				if err := tx.Where("key = ?", registrationIds[i]).Delete(ApiKey{}).Error; err != nil {
-					raven.CaptureErrorAndWait(err, nil)
-				}
-			} else if response.Results[i].Error == "MissingRegistration" {
-				raven.CaptureMessage("Got MissingRegistration", map[string]string{"registrationId": registrationIds[i]})
-				if err := tx.Where("key = ?", registrationIds[i]).Delete(ApiKey{}).Error; err != nil {
-					raven.CaptureErrorAndWait(err, nil)
-				}
-			} else {
-				log.WithFields(log.Fields{"error": response.Results[i].Error}).Warn("Unknown push error.")
-				raven.CaptureMessage("Unknown push error.", map[string]string{"error": response.Results[i].Error, "registrationId": registrationIds[i]})
-			}
-		}
-
-		if len(response.Results[i].RegistrationId) > 0 {
-			// Replace our push key with a new one
+		log.WithFields(log.Fields{"error": singleResponse.Error, "msg": singleResponse.MessageID}).Warn("Error while dispatching to token.")
+		error := singleResponse.Error
+		GetStatistics().FailedMessages++
+		if messaging.IsRegistrationTokenNotRegistered(error) {
+			log.WithField("apiKey", registrationIds[i]).Info("Removing not registered push key.")
 			if err := tx.Where("key = ?", registrationIds[i]).Delete(ApiKey{}).Error; err != nil {
 				raven.CaptureErrorAndWait(err, nil)
 			}
-
-			key := ApiKey{Key: response.Results[i].RegistrationId, RegistrationTime: time.Now().Unix(), UserAgent: "From Google"}
-			if err := tx.Where("key = ?", response.Results[i].RegistrationId).FirstOrInit(&key).Error; err != nil {
-				raven.CaptureErrorAndWait(err, nil)
-			}
-
-			if tx.NewRecord(key) {
-				if err := tx.Save(key).Error; err != nil {
-					raven.CaptureErrorAndWait(err, nil)
-				}
-			}
-
-			GetStatistics().UpdatedPushKeys++
-			log.WithFields(log.Fields{"old": registrationIds[i], "new": response.Results[i].RegistrationId}).Info("Replacing GCM key with canonical version.")
 		}
 	}
 }

@@ -13,8 +13,8 @@ import (
 
 type Config struct {
 	Push struct {
-		ApiKey string
 		Dsn    string
+		FirebaseJson string
 	}
 }
 
@@ -76,7 +76,7 @@ func main() {
 	// Dispatcher processor
 	router := httprouter.New()
 
-	go PushDispatcher(eventIdsChannel, configuration.Push.ApiKey)
+	go PushDispatcher(eventIdsChannel, configuration.Push.FirebaseJson)
 	go ApiService(eventsChannel, camerasChannel, pricesChannel, router)
 
 	ParseTrafficEvents(eventIdsChannel, eventsChannel)

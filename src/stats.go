@@ -13,6 +13,7 @@ import (
 type Statistics struct {
 	Dispatches       int
 	FailedDispatches int
+	FailedMessages 	 int
 	UpdatedPushKeys  int
 
 	DeviceRegistrations          int
@@ -61,6 +62,7 @@ func ShowStatistics(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 	fmt.Fprintf(w, "today_device_unregistrations:%d\n", statistics.DeviceUnregistrations)
 	fmt.Fprintf(w, "today_device_unregistrations_invalid:%d\n", statistics.DeviceUnregistrationsInvalid)
 	fmt.Fprintf(w, "today_device_updatedkeys:%d\n", statistics.UpdatedPushKeys)
+	fmt.Fprintf(w, "today_failed_messages:%d\n", statistics.FailedMessages)
 }
 
 func GetStatistics() *Statistics {

@@ -81,10 +81,11 @@ func main() {
 
 	ParseTrafficEvents(eventIdsChannel, eventsChannel)
 	ParseTrafficCameras(camerasChannel)
-	ParseFuelPrices(pricesChannel)
+	// Fuel prices are disabled because they're broken.
+	//ParseFuelPrices(pricesChannel)
 	c := cron.New()
 	c.AddFunc("@every 6m", func() { ParseTrafficEvents(eventIdsChannel, eventsChannel) })
-	c.AddFunc("@every 6m", func() { ParseFuelPrices(pricesChannel) })
+	//c.AddFunc("@every 6m", func() { ParseFuelPrices(pricesChannel) })
 	c.AddFunc("@every 30m", func() { ParseTrafficCameras(camerasChannel) })
 	c.Start()
 

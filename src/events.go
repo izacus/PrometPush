@@ -1,4 +1,4 @@
-package main
+package src
 
 import (
 	"bytes"
@@ -49,7 +49,7 @@ func getEvents(english bool) ([]Dogodek, error) {
 		buf := new(bytes.Buffer)
 		buf.ReadFrom(response.Body)
 
-		if decode_error != nil {
+		if decodeError != nil {
 			raven.CaptureErrorAndWait(decodeError, map[string]string{"response": buf.String()})
 		} else {
 			raven.CaptureMessageAndWait("Invalid response received!", map[string]string{"response": buf.String()})
@@ -64,7 +64,7 @@ func getEvents(english bool) ([]Dogodek, error) {
 	return items, nil
 }
 
-func ParseTrafficEvents(eventIdsChannel chan<- []string, eventsChannel chan<- []Dogodek) {
+func ParseTrafficEvents(eventIdsChannel chan<- []string, eventsChannel chan<- []Dogodek, debugMode bool) {
 	items, err := getEvents(false)
 	if err != nil {
 		return
@@ -116,7 +116,7 @@ func ParseTrafficEvents(eventIdsChannel chan<- []string, eventsChannel chan<- []
 
 		log.WithFields(log.Fields{"Count": count, "Id": item.Id}).Debug("Checking event.")
 
-		if !DebugMode && count > 0 {
+		if !debugMode && count > 0 {
 			continue
 		}
 

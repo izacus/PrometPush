@@ -5,6 +5,8 @@ import (
 	"os"
 	"time"
 
+	. "github.com/izacus/PrometPush/src"
+
 	"github.com/getsentry/sentry-go"
 	"github.com/julienschmidt/httprouter"
 	"github.com/robfig/cron"
@@ -76,13 +78,13 @@ func main() {
 		}
 	}
 
-	if err := InitializeDbConnection(); err != nil {
+	if err := InitializeDbConnection(DebugMode); err != nil {
 		sentry.CaptureException(err)
 		panic("Failed to connect to database")
 	}
 
-	db := GetDbConnection()
-	defer db.Close()
+	database := GetDbConnection()
+	defer database.Close()
 
 	eventIdsChannel := make(chan []string)
 	eventsChannel := make(chan []Dogodek)
@@ -92,15 +94,15 @@ func main() {
 	// Dispatcher processor
 	router := httprouter.New()
 
-	go PushDispatcher(eventIdsChannel, configuration.Push.FirebaseJson)
+	go PushDispatcher(eventIdsChannel, configuration.Push.FirebaseJson, configuration.Push.IndividualPush, DebugMode)
 	go ApiService(eventsChannel, camerasChannel, pricesChannel, router)
 
-	ParseTrafficEvents(eventIdsChannel, eventsChannel)
+	ParseTrafficEvents(eventIdsChannel, eventsChannel, DebugMode)
 	ParseTrafficCameras(camerasChannel)
 	// Fuel prices are disabled because they're broken.
 	//ParseFuelPrices(pricesChannel)
 	c := cron.New()
-	c.AddFunc("@every 6m", func() { ParseTrafficEvents(eventIdsChannel, eventsChannel) })
+	c.AddFunc("@every 6m", func() { ParseTrafficEvents(eventIdsChannel, eventsChannel, DebugMode) })
 	//c.AddFunc("@every 6m", func() { ParseFuelPrices(pricesChannel) })
 	c.AddFunc("@every 30m", func() { ParseTrafficCameras(camerasChannel) })
 	c.Start()

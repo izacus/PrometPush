@@ -1,4 +1,4 @@
-package main
+package src
 
 import (
 	"bytes"
@@ -44,7 +44,7 @@ type pushPayload struct {
 
 // PushDispatcher handles dispatching of notifications to the GCM server. The notifications are coming from the channel
 // listed.
-func PushDispatcher(eventIdsChannel <-chan []string, firebaseConfigurationJSONFile string, individualPushEnabled bool) {
+func PushDispatcher(eventIdsChannel <-chan []string, firebaseConfigurationJSONFile string, individualPushEnabled bool, debugMode bool) {
 	log.WithField("serverApiKey", firebaseConfigurationJSONFile).Debug("Initializing dispatcher.")
 
 	// Paginate apikeys on a page boundary due to GCM server limit
@@ -80,7 +80,7 @@ func PushDispatcher(eventIdsChannel <-chan []string, firebaseConfigurationJSONFi
 			return
 		}
 
-		dispatchPayloadToTopic(ctx, data, client)
+		dispatchPayloadToTopic(ctx, data, client, debugMode)
 
 		if individualPushEnabled {
 			var keyCount int
@@ -104,7 +104,7 @@ func PushDispatcher(eventIdsChannel <-chan []string, firebaseConfigurationJSONFi
 				log.WithField("num", len(keys)).Info("Dispatching payload...")
 				payload := pushPayload{RegistrationIds: keys}
 				payload.Events = data
-				dispatchPayload(ctx, tx, payload, client)
+				dispatchPayload(ctx, tx, payload, client, debugMode)
 			}
 		}
 
@@ -164,7 +164,7 @@ func getData(tx *gorm.DB, ids []string) []PushEvent {
 	return events
 }
 
-func dispatchPayloadToTopic(ctx context.Context, events []PushEvent, client *messaging.Client) {
+func dispatchPayloadToTopic(ctx context.Context, events []PushEvent, client *messaging.Client, debugMode bool) {
 	log.Debug("Dispatching to topics...")
 	var jsonData bytes.Buffer
 	if err := json.NewEncoder(&jsonData).Encode(events); err != nil {
@@ -189,7 +189,8 @@ func dispatchPayloadToTopic(ctx context.Context, events []PushEvent, client *mes
 
 	var err error
 	for {
-		if DebugMode {
+		GetStatistics().Dispatches++
+		if debugMode {
 			_, err = client.SendDryRun(ctx, message)
 		} else {
 			_, err = client.Send(ctx, message)
@@ -203,7 +204,8 @@ func dispatchPayloadToTopic(ctx context.Context, events []PushEvent, client *mes
 			break
 		}
 
-		log.WithFields(log.Fields{"err": err, "data": json_data}).Error("Failed to send topic package.")
+		log.WithFields(log.Fields{"err": err, "data": jsonData}).Error("Failed to send topic package.")
+		GetStatistics().FailedDispatches++
 		sentry.CaptureException(err)
 		time.Sleep(time.Duration(retrySecs) * time.Second)
 		retryCount = retryCount - 1
@@ -213,7 +215,7 @@ func dispatchPayloadToTopic(ctx context.Context, events []PushEvent, client *mes
 	log.Info("Topic dispatch OK.")
 }
 
-func dispatchPayload(ctx context.Context, tx *gorm.DB, payload pushPayload, client *messaging.Client) {
+func dispatchPayload(ctx context.Context, tx *gorm.DB, payload pushPayload, client *messaging.Client, debugMode bool) {
 	log.Debug("Dispatching...")
 
 	var jsonData bytes.Buffer
@@ -245,7 +247,7 @@ func dispatchPayload(ctx context.Context, tx *gorm.DB, payload pushPayload, clie
 
 	for {
 
-		if DebugMode {
+		if debugMode {
 			response, err = client.SendMulticastDryRun(ctx, message)
 		} else {
 			response, err = client.SendMulticast(ctx, message)
@@ -260,7 +262,7 @@ func dispatchPayload(ctx context.Context, tx *gorm.DB, payload pushPayload, clie
 			break
 		}
 
-		log.WithFields(log.Fields{"err": err, "data": json_data.String()}).Error("Failed to send GCM package.")
+		log.WithFields(log.Fields{"err": err, "data": jsonData.String()}).Error("Failed to send GCM package.")
 		GetStatistics().FailedDispatches++
 		sentry.CaptureException(err)
 		time.Sleep(time.Duration(retrySecs) * time.Second)

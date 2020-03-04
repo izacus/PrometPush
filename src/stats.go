@@ -1,11 +1,10 @@
-package main
+package src
 
 import (
 	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/getsentry/sentry-go"
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
 )
@@ -26,7 +25,6 @@ type Statistics struct {
 var stats Statistics
 
 func ShowStatistics(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	raven.SetHttpContext(raven.NewHttp(r))
 	r.Close = true
 	db := GetDbConnection()
 	tx := db.Begin()

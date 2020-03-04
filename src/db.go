@@ -1,4 +1,4 @@
-package main
+package src
 
 import (
 	"time"
@@ -45,10 +45,10 @@ type ApiKey struct {
 
 var db *gorm.DB
 
-func InitializeDbConnection() error {
+func InitializeDbConnection(debugMode bool) error {
 	var err error
 
-	if DebugMode {
+	if debugMode {
 		db, err = gorm.Open("sqlite3", "debug.db")
 	} else {
 		db, err = gorm.Open("postgres", "dbname=promet_push sslmode=disable")
@@ -69,7 +69,7 @@ func InitializeDbConnection() error {
 
 	db.DB().SetMaxIdleConns(10)
 
-	db.LogMode(DebugMode)
+	db.LogMode(debugMode)
 	db.SingularTable(true)
 
 	if (!db.HasTable(&ApiKey{})) {
@@ -79,13 +79,13 @@ func InitializeDbConnection() error {
 
 	result := db.AutoMigrate(&Dogodek{})
 	if result.Error != nil {
-		raven.CaptureErrorAndWait(result.Error, nil)
+		sentry.CaptureException(result.Error)
 		log.WithFields(log.Fields{"err": err}).Error("Failed to migrate database!")
 		return result.Error
 	}
 
 	// We don't run migrations on SQLite3
-	if DebugMode {
+	if debugMode {
 		return nil
 	}
 

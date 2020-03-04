@@ -4,3 +4,4 @@ dbname=promet_push
 [push]
 dsn=SENTRY_DSN_HERE
 firebaseJson=firebase-exported-json.json
+individualPush=false

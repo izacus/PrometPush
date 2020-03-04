@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	firebase "firebase.google.com/go"
-	"firebase.google.com/go/messaging"
-	"google.golang.org/api/option"
 	"hash/fnv"
 	"math"
 	"time"
+
+	firebase "firebase.google.com/go"
+	"firebase.google.com/go/messaging"
+	"google.golang.org/api/option"
 
 	_ "firebase.google.com/go"
 	"github.com/getsentry/raven-go"
@@ -17,8 +18,9 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const PAGE_SIZE = 99
+const pageSize = 99
 
+// PushEvent describes a single event happening on the road.
 type PushEvent struct {
 	Id            int64   `json:"id"`
 	Cause         string  `json:"cause"`
@@ -37,10 +39,12 @@ type PushEvent struct {
 
 type PushPayload struct {
 	RegistrationIds []string
-	Events []PushEvent
+	Events          []PushEvent
 }
 
-func PushDispatcher(eventIdsChannel <-chan []string, firebaseConfigurationJsonFile string) {
+// PushDispatcher handles dispatching of notifications to the GCM server. The notifications are coming from the channel
+// listed.
+func PushDispatcher(eventIdsChannel <-chan []string, firebaseConfigurationJsonFile string, individualPushEnabled bool) {
 	log.WithField("serverApiKey", firebaseConfigurationJsonFile).Debug("Initializing dispatcher.")
 
 	// Paginate apikeys on a page boundary due to GCM server limit
@@ -58,7 +62,7 @@ func PushDispatcher(eventIdsChannel <-chan []string, firebaseConfigurationJsonFi
 	}
 
 	if client, err = app.Messaging(ctx); err != nil {
-		log.WithField("error", err).Fatal("Failed to initialize firebase client.");
+		log.WithField("error", err).Fatal("Failed to initialize firebase client.")
 	}
 
 	for {
@@ -76,30 +80,32 @@ func PushDispatcher(eventIdsChannel <-chan []string, firebaseConfigurationJsonFi
 			return
 		}
 
-		dispatchPayloadToTopic(data, client, ctx)
+		dispatchPayloadToTopic(ctx, data, client)
 
-		var keyCount int
-		if err := tx.Model(&ApiKey{}).Count(&keyCount).Error; err != nil {
-			log.WithField("error", err).Error("Failed to check existence of an event.")
-			raven.CaptureErrorAndWait(err, nil)
-			continue
-		}
-
-		pages := int(math.Ceil(float64(keyCount) / float64(PAGE_SIZE)))
-
-		for page := 0; page < pages; page++ {
-			// Get list of ApiKeys
-			var keys []string
-			if err := tx.Limit(PAGE_SIZE).Offset(page*PAGE_SIZE).Model(&ApiKey{}).Pluck("key", &keys).Error; err != nil {
-				log.WithField("error", err).Error("Failed load device tokens")
+		if individualPushEnabled {
+			var keyCount int
+			if err := tx.Model(&ApiKey{}).Count(&keyCount).Error; err != nil {
+				log.WithField("error", err).Error("Failed to check existence of an event.")
 				raven.CaptureErrorAndWait(err, nil)
 				continue
 			}
 
-			log.WithField("num", len(keys)).Info("Dispatching payload...")
-			payload := PushPayload{RegistrationIds: keys}
-			payload.Events = data
-			dispatchPayload(tx, payload, client, ctx)
+			pages := int(math.Ceil(float64(keyCount) / float64(pageSize)))
+
+			for page := 0; page < pages; page++ {
+				// Get list of ApiKeys
+				var keys []string
+				if err := tx.Limit(pageSize).Offset(page*pageSize).Model(&ApiKey{}).Pluck("key", &keys).Error; err != nil {
+					log.WithField("error", err).Error("Failed load device tokens")
+					raven.CaptureErrorAndWait(err, nil)
+					continue
+				}
+
+				log.WithField("num", len(keys)).Info("Dispatching payload...")
+				payload := PushPayload{RegistrationIds: keys}
+				payload.Events = data
+				dispatchPayload(ctx, tx, payload, client)
+			}
 		}
 
 		tx.Commit()
@@ -109,7 +115,7 @@ func PushDispatcher(eventIdsChannel <-chan []string, firebaseConfigurationJsonFi
 func getData(tx *gorm.DB, ids []string) []PushEvent {
 	// There's a payload limit on FCM so we need to make sure we don't send too many.
 	if len(ids) > 10 {
-		ids = ids[len(ids) - 10:]
+		ids = ids[len(ids)-10:]
 	}
 
 	events := make([]PushEvent, len(ids))
@@ -138,9 +144,9 @@ func getData(tx *gorm.DB, ids []string) []PushEvent {
 		// Calculate Id hash
 		algo := fnv.New32a()
 		algo.Write([]byte(event.Id))
-		id_hash := int64(algo.Sum32())
+		idHash := int64(algo.Sum32())
 
-		events[i] = PushEvent{Id: id_hash,
+		events[i] = PushEvent{Id: idHash,
 			Cause:         event.Vzrok,
 			CauseEn:       event.VzrokEn,
 			Road:          event.Cesta,
@@ -158,10 +164,10 @@ func getData(tx *gorm.DB, ids []string) []PushEvent {
 	return events
 }
 
-func dispatchPayloadToTopic(events []PushEvent, client *messaging.Client, ctx context.Context) {
+func dispatchPayloadToTopic(ctx context.Context, events []PushEvent, client *messaging.Client) {
 	log.Debug("Dispatching to topics...")
-	var json_data bytes.Buffer
-	if err := json.NewEncoder(&json_data).Encode(events); err != nil {
+	var jsonData bytes.Buffer
+	if err := json.NewEncoder(&jsonData).Encode(events); err != nil {
 		log.WithField("error", err).Error("Failed to encode JSON payload for dispatch.")
 		raven.CaptureErrorAndWait(err, nil)
 		return
@@ -169,8 +175,8 @@ func dispatchPayloadToTopic(events []PushEvent, client *messaging.Client, ctx co
 
 	var ttl = time.Duration(2) * time.Hour
 	message := &messaging.Message{
-		Data:         map[string]string {
-			"events": json_data.String(),
+		Data: map[string]string{
+			"events": jsonData.String(),
 		},
 		Topic: "allRoadEvents",
 		Android: &messaging.AndroidConfig{
@@ -183,7 +189,7 @@ func dispatchPayloadToTopic(events []PushEvent, client *messaging.Client, ctx co
 
 	var err error
 	for {
-		if (DebugMode) {
+		if DebugMode {
 			_, err = client.SendDryRun(ctx, message)
 		} else {
 			_, err = client.Send(ctx, message)
@@ -208,24 +214,24 @@ func dispatchPayloadToTopic(events []PushEvent, client *messaging.Client, ctx co
 	log.Info("Topic dispatch OK.")
 }
 
-func dispatchPayload(tx *gorm.DB, payload PushPayload, client *messaging.Client, ctx context.Context) {
+func dispatchPayload(ctx context.Context, tx *gorm.DB, payload PushPayload, client *messaging.Client) {
 	log.Debug("Dispatching...")
 
-	var json_data bytes.Buffer
-	if err := json.NewEncoder(&json_data).Encode(payload.Events); err != nil {
+	var jsonData bytes.Buffer
+	if err := json.NewEncoder(&jsonData).Encode(payload.Events); err != nil {
 		log.WithField("error", err).Error("Failed to encode JSON payload for dispatch.")
 		raven.CaptureErrorAndWait(err, nil)
 		return
 	}
 
-	log.WithField("payload", json_data.String()).Debug("Dispatching pushes.")
+	log.WithField("payload", jsonData.String()).Debug("Dispatching pushes.")
 
 	var ttl = time.Duration(2) * time.Hour
 	message := &messaging.MulticastMessage{
 		Data: map[string]string{
-			"events": json_data.String(),
+			"events": jsonData.String(),
 		},
-		Tokens:  payload.RegistrationIds,
+		Tokens: payload.RegistrationIds,
 		Android: &messaging.AndroidConfig{
 			TTL: &ttl,
 		},
@@ -240,7 +246,7 @@ func dispatchPayload(tx *gorm.DB, payload PushPayload, client *messaging.Client,
 
 	for {
 
-		if (DebugMode) {
+		if DebugMode {
 			response, err = client.SendMulticastDryRun(ctx, message)
 		} else {
 			response, err = client.SendMulticast(ctx, message)

@@ -13,8 +13,9 @@ import (
 
 type Config struct {
 	Push struct {
-		Dsn    string
-		FirebaseJson string
+		Dsn            string
+		FirebaseJson   string
+		IndividualPush bool
 	}
 }
 
@@ -52,7 +53,7 @@ func main() {
 	log.Infof("PrometPush version %s built on %s", GitCommit, BuildDate)
 
 	configuration := getConfiguration()
-	if (!DebugMode) {
+	if !DebugMode {
 		raven.SetDSN(configuration.Push.Dsn)
 	}
 

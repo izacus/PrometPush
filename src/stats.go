@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/getsentry/raven-go"
+	"github.com/getsentry/sentry-go"
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
 )

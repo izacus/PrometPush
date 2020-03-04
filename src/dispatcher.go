@@ -13,7 +13,7 @@ import (
 	"google.golang.org/api/option"
 
 	_ "firebase.google.com/go"
-	"github.com/getsentry/raven-go"
+	"github.com/getsentry/sentry-go"
 	"github.com/jinzhu/gorm"
 	log "github.com/sirupsen/logrus"
 )
@@ -86,7 +86,7 @@ func PushDispatcher(eventIdsChannel <-chan []string, firebaseConfigurationJSONFi
 			var keyCount int
 			if err := tx.Model(&ApiKey{}).Count(&keyCount).Error; err != nil {
 				log.WithField("error", err).Error("Failed to check existence of an event.")
-				raven.CaptureErrorAndWait(err, nil)
+				sentry.CaptureException(err)
 				continue
 			}
 
@@ -97,7 +97,7 @@ func PushDispatcher(eventIdsChannel <-chan []string, firebaseConfigurationJSONFi
 				var keys []string
 				if err := tx.Limit(pageSize).Offset(page*pageSize).Model(&ApiKey{}).Pluck("key", &keys).Error; err != nil {
 					log.WithField("error", err).Error("Failed load device tokens")
-					raven.CaptureErrorAndWait(err, nil)
+					sentry.CaptureException(err)
 					continue
 				}
 
@@ -123,7 +123,7 @@ func getData(tx *gorm.DB, ids []string) []PushEvent {
 		var event Dogodek
 		if err := tx.First(&event, "id = ?", ids[i]).Error; err != nil {
 			log.WithFields(log.Fields{"id": ids[i]}).Error("Failed to retrieve event data for dispatch")
-			raven.CaptureErrorAndWait(err, nil)
+			sentry.CaptureException(err)
 			return nil
 		}
 
@@ -169,7 +169,7 @@ func dispatchPayloadToTopic(ctx context.Context, events []PushEvent, client *mes
 	var jsonData bytes.Buffer
 	if err := json.NewEncoder(&jsonData).Encode(events); err != nil {
 		log.WithField("error", err).Error("Failed to encode JSON payload for dispatch.")
-		raven.CaptureErrorAndWait(err, nil)
+		sentry.CaptureException(err)
 		return
 	}
 
@@ -204,8 +204,7 @@ func dispatchPayloadToTopic(ctx context.Context, events []PushEvent, client *mes
 		}
 
 		log.WithFields(log.Fields{"err": err, "data": json_data}).Error("Failed to send topic package.")
-		raven.CaptureErrorAndWait(err, nil)
-
+		sentry.CaptureException(err)
 		time.Sleep(time.Duration(retrySecs) * time.Second)
 		retryCount = retryCount - 1
 		retrySecs = retrySecs * 2
@@ -220,7 +219,7 @@ func dispatchPayload(ctx context.Context, tx *gorm.DB, payload pushPayload, clie
 	var jsonData bytes.Buffer
 	if err := json.NewEncoder(&jsonData).Encode(payload.Events); err != nil {
 		log.WithField("error", err).Error("Failed to encode JSON payload for dispatch.")
-		raven.CaptureErrorAndWait(err, nil)
+		sentry.CaptureException(err)
 		return
 	}
 
@@ -263,8 +262,7 @@ func dispatchPayload(ctx context.Context, tx *gorm.DB, payload pushPayload, clie
 
 		log.WithFields(log.Fields{"err": err, "data": json_data.String()}).Error("Failed to send GCM package.")
 		GetStatistics().FailedDispatches++
-		raven.CaptureErrorAndWait(err, nil)
-
+		sentry.CaptureException(err)
 		time.Sleep(time.Duration(retrySecs) * time.Second)
 		retryCount = retryCount - 1
 		retrySecs = retrySecs * 2
@@ -290,7 +288,7 @@ func processResponse(tx *gorm.DB, registrationIds []string, response *messaging.
 		if messaging.IsRegistrationTokenNotRegistered(error) {
 			log.WithField("apiKey", registrationIds[i]).Info("Removing not registered push key.")
 			if err := tx.Where("key = ?", registrationIds[i]).Delete(ApiKey{}).Error; err != nil {
-				raven.CaptureErrorAndWait(err, nil)
+				sentry.CaptureException(err)
 			}
 		}
 	}

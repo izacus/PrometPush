@@ -3,7 +3,7 @@ package main
 import (
 	"time"
 
-	"github.com/getsentry/raven-go"
+	"github.com/getsentry/sentry-go"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	_ "github.com/lib/pq"
@@ -48,21 +48,21 @@ var db *gorm.DB
 func InitializeDbConnection() error {
 	var err error
 
-	if (DebugMode) {
+	if DebugMode {
 		db, err = gorm.Open("sqlite3", "debug.db")
 	} else {
 		db, err = gorm.Open("postgres", "dbname=promet_push sslmode=disable")
 	}
 
 	if err != nil {
-		raven.CaptureErrorAndWait(err, nil)
+		sentry.CaptureException(err)
 		log.WithFields(log.Fields{"err": err}).Error("Failed to connect to database.")
 		panic("Could not connect to database!")
 	}
 
 	err = db.DB().Ping()
 	if err != nil {
-		raven.CaptureErrorAndWait(err, nil)
+		sentry.CaptureException(err)
 		log.WithFields(log.Fields{"err": err}).Error("Failed to connect to database.")
 		panic("Could not connect to database!")
 	}
@@ -85,7 +85,7 @@ func InitializeDbConnection() error {
 	}
 
 	// We don't run migrations on SQLite3
-	if (DebugMode) {
+	if DebugMode {
 		return nil
 	}
 
@@ -103,7 +103,7 @@ func InitializeDbConnection() error {
 
 	if err = migration.Migrate(); err != nil {
 		log.Fatalf("Could not migrate: %v", err)
-		raven.CaptureErrorAndWait(err, nil)
+		sentry.CaptureException(err)
 	}
 
 	return nil

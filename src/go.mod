@@ -6,6 +6,7 @@ require (
 	firebase.google.com/go v3.9.0+incompatible
 	github.com/certifi/gocertifi v0.0.0-20190905060710-a5e0173ced67 // indirect
 	github.com/getsentry/raven-go v0.2.0
+	github.com/getsentry/sentry-go v0.5.1
 	github.com/jinzhu/gorm v1.9.10
 	github.com/julienschmidt/httprouter v1.2.0
 	github.com/lib/pq v1.2.0

@@ -3,8 +3,9 @@ package main
 import (
 	"net/http"
 	"os"
+	"time"
 
-	"github.com/getsentry/raven-go"
+	"github.com/getsentry/sentry-go"
 	"github.com/julienschmidt/httprouter"
 	"github.com/robfig/cron"
 	"github.com/scalingdata/gcfg"
@@ -33,7 +34,7 @@ func main() {
 			os.Mkdir("log", 0755)
 			f, err := os.OpenFile("log/promet_push.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			if err != nil {
-				raven.CaptureErrorAndWait(err, nil)
+				sentry.CaptureException(err)
 				log.WithField("error", err).Error("Failed to open log file")
 			}
 			defer f.Close()
@@ -55,15 +56,28 @@ func main() {
 
 	configuration := getConfiguration()
 	if !DebugMode {
-		raven.SetDSN(configuration.Push.Dsn)
-	}
+		// Since this is a daemon we want to use sync transport
+		// to Sentry server to make sure errors always reach it.
+		transport := sentry.NewHTTPSyncTransport()
+		transport.Timeout = time.Second * 3
 
-	if GitCommit != "UNKNOWN" {
-		raven.SetRelease(GitCommit)
+		clientOptions := sentry.ClientOptions{
+			Dsn:       configuration.Push.Dsn,
+			Transport: transport,
+		}
+
+		if GitCommit != "UNKNOWN" {
+			clientOptions.Release = GitCommit
+		}
+
+		err := sentry.Init(clientOptions)
+		if err != nil {
+			log.WithField("error", err).Error("Failed to initialize Sentry!")
+		}
 	}
 
 	if err := InitializeDbConnection(); err != nil {
-		raven.CaptureErrorAndWait(err, nil)
+		sentry.CaptureException(err)
 		panic("Failed to connect to database")
 	}
 

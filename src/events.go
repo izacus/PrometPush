@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/getsentry/raven-go"
+	"github.com/getsentry/sentry-go"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -29,7 +30,7 @@ func getEvents(english bool) ([]Dogodek, error) {
 			log.WithFields(log.Fields{"err": err}).Error("Failed to retrieve data from server.")
 		}
 
-		raven.CaptureErrorAndWait(err, nil)
+		sentry.CaptureException(err)
 		return nil, err
 	}
 
@@ -109,7 +110,7 @@ func ParseTrafficEvents(eventIdsChannel chan<- []string, eventsChannel chan<- []
 
 		var count int
 		if err := tx.Where("id = ?", item.Id).Model(&Dogodek{}).Count(&count).Error; err != nil {
-			raven.CaptureErrorAndWait(err, nil)
+			sentry.CaptureException(err)
 			continue
 		}
 

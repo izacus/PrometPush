@@ -2,9 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/getsentry/raven-go"
-	log "github.com/sirupsen/logrus"
 	"net/http"
+
+	"github.com/getsentry/sentry-go"
+	log "github.com/sirupsen/logrus"
 )
 
 type GasStationPrice struct {
@@ -43,7 +44,7 @@ func ParseFuelPrices(pricesChannel chan<- []GasStationPrice) error {
 			log.WithFields(log.Fields{"err": err}).Error("Failed to retrieve data from server.")
 		}
 
-		raven.CaptureErrorAndWait(err, nil)
+		sentry.CaptureException(err)
 		return err
 	}
 

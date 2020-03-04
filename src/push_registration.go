@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/getsentry/raven-go"
+	"github.com/getsentry/sentry-go"
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
 )
@@ -15,7 +16,7 @@ func RegisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("Failed to read ApiKey from request.")
-		raven.CaptureErrorAndWait(err, nil)
+		sentry.CaptureException(err)
 		return
 	}
 
@@ -73,7 +74,7 @@ func UnregisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 	tx := db.Begin()
 	var count int
 	if err := tx.Where("key = ?", apiKeyStr).Model(&ApiKey{}).Count(&count).Error; err != nil {
-		raven.CaptureErrorAndWait(err, nil)
+		sentry.CaptureException(err)
 		log.WithFields(log.Fields{"err": err, "apiKey": apiKeyStr, "ua": r.UserAgent()}).Error("Failed to check for API key!")
 		tx.Rollback()
 		return

@@ -19,7 +19,8 @@ type Config struct {
 	}
 }
 
-var GitCommit, BuildDate string
+var GitCommit string
+var BuildDate string
 var DebugMode bool
 
 func main() {

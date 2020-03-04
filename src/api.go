@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// JsonEvent describes an event coming from the upstream API.
 type JsonEvent struct {
 	Id               int64     `json:"id,string"`
 	Y_wgs            float64   `json:"y_wgs"`
@@ -29,7 +30,8 @@ type JsonEvent struct {
 	ValidTo          time.Time `json:"valid_to"`
 }
 
-type ApiResponse struct {
+// APIResponse represents data returned from the API to the client app.
+type APIResponse struct {
 	Events  []JsonEvent       `json:"events"`
 	Cameras []Camera          `json:"cameras"`
 	Prices  []GasStationPrice `json:"prices"`
@@ -39,6 +41,7 @@ var currentEvents []JsonEvent
 var currentCameras []Camera
 var currentPrices []GasStationPrice
 
+// ShowTrafficData renders current traffic data into JSON for the client app.
 func ShowTrafficData(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	r.Close = true
 	if currentEvents == nil || currentCameras == nil {
@@ -72,7 +75,7 @@ func ShowTrafficData(w http.ResponseWriter, r *http.Request, _ httprouter.Params
 		prices = currentPrices
 	}
 
-	enc.Encode(ApiResponse{events, cameras, prices})
+	enc.Encode(APIResponse{events, cameras, prices})
 }
 
 func eventService(eventsChannel <-chan []Dogodek) {
@@ -84,10 +87,10 @@ func eventService(eventsChannel <-chan []Dogodek) {
 			// Calculate Id hash
 			algo := fnv.New32a()
 			algo.Write([]byte(event.Id))
-			id_hash := int64(algo.Sum32())
+			idHash := int64(algo.Sum32())
 
 			jsonEvent := JsonEvent{
-				id_hash,
+				idHash,
 				event.Y_wgs,
 				event.X_wgs,
 				event.Kategorija,

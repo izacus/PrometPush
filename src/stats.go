@@ -13,7 +13,7 @@ import (
 type Statistics struct {
 	Dispatches       int
 	FailedDispatches int
-	FailedMessages 	 int
+	FailedMessages   int
 	UpdatedPushKeys  int
 
 	DeviceRegistrations          int
@@ -43,11 +43,11 @@ func ShowStatistics(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 	fmt.Fprintf(w, "registered_api_keys:%d\n", count)
 
 	// Find todays events
-	time_now := time.Now()
-	time_today := time.Date(time_now.Year(), time_now.Month(), time_now.Day(),
-		0, 0, 0, 0, time_now.Location())
+	timeNow := time.Now()
+	timeToday := time.Date(timeNow.Year(), timeNow.Month(), timeNow.Day(),
+		0, 0, 0, 0, timeNow.Location())
 
-	err = tx.Where("vneseno > ?", time_today.Unix()/1000).Model(&Dogodek{}).Count(&count)
+	err = tx.Where("vneseno > ?", timeToday.Unix()/1000).Model(&Dogodek{}).Count(&count)
 	if err.Error != nil {
 		log.WithFields(log.Fields{"err": err.Error}).Error("Failed to retrieve statistics.")
 		count = -1
@@ -66,10 +66,10 @@ func ShowStatistics(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 }
 
 func GetStatistics() *Statistics {
-	time_now := time.Now()
-	if time_now.Day() != stats.Created.Day() || time_now.Month() != stats.Created.Month() {
+	timeNow := time.Now()
+	if timeNow.Day() != stats.Created.Day() || timeNow.Month() != stats.Created.Month() {
 		stats = Statistics{}
-		stats.Created = time_now
+		stats.Created = timeNow
 	}
 
 	return &stats

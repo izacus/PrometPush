@@ -43,13 +43,13 @@ func getEvents(english bool) ([]Dogodek, error) {
 		} `json:"Contents"`
 	}
 
-	decode_error := dec.Decode(&data)
-	if decode_error != nil || len(data.Contents) == 0 {
+	decodeError := dec.Decode(&data)
+	if decodeError != nil || len(data.Contents) == 0 {
 		buf := new(bytes.Buffer)
 		buf.ReadFrom(response.Body)
 
 		if decode_error != nil {
-			raven.CaptureErrorAndWait(decode_error, map[string]string{"response": buf.String()})
+			raven.CaptureErrorAndWait(decodeError, map[string]string{"response": buf.String()})
 		} else {
 			raven.CaptureMessageAndWait("Invalid response received!", map[string]string{"response": buf.String()})
 		}

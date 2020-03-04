@@ -37,20 +37,20 @@ type PushEvent struct {
 	X_wgs         float64 `json:"x_wgs"`
 }
 
-type PushPayload struct {
+type pushPayload struct {
 	RegistrationIds []string
 	Events          []PushEvent
 }
 
 // PushDispatcher handles dispatching of notifications to the GCM server. The notifications are coming from the channel
 // listed.
-func PushDispatcher(eventIdsChannel <-chan []string, firebaseConfigurationJsonFile string, individualPushEnabled bool) {
-	log.WithField("serverApiKey", firebaseConfigurationJsonFile).Debug("Initializing dispatcher.")
+func PushDispatcher(eventIdsChannel <-chan []string, firebaseConfigurationJSONFile string, individualPushEnabled bool) {
+	log.WithField("serverApiKey", firebaseConfigurationJSONFile).Debug("Initializing dispatcher.")
 
 	// Paginate apikeys on a page boundary due to GCM server limit
 	db := GetDbConnection()
 
-	opt := option.WithCredentialsFile(firebaseConfigurationJsonFile)
+	opt := option.WithCredentialsFile(firebaseConfigurationJSONFile)
 	ctx := context.Background()
 
 	var app *firebase.App
@@ -102,7 +102,7 @@ func PushDispatcher(eventIdsChannel <-chan []string, firebaseConfigurationJsonFi
 				}
 
 				log.WithField("num", len(keys)).Info("Dispatching payload...")
-				payload := PushPayload{RegistrationIds: keys}
+				payload := pushPayload{RegistrationIds: keys}
 				payload.Events = data
 				dispatchPayload(ctx, tx, payload, client)
 			}
@@ -214,7 +214,7 @@ func dispatchPayloadToTopic(ctx context.Context, events []PushEvent, client *mes
 	log.Info("Topic dispatch OK.")
 }
 
-func dispatchPayload(ctx context.Context, tx *gorm.DB, payload PushPayload, client *messaging.Client) {
+func dispatchPayload(ctx context.Context, tx *gorm.DB, payload pushPayload, client *messaging.Client) {
 	log.Debug("Dispatching...")
 
 	var jsonData bytes.Buffer

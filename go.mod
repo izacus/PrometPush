@@ -5,6 +5,7 @@ go 1.14
 require (
 	cloud.google.com/go/firestore v1.2.0 // indirect
 	firebase.google.com/go v3.13.0+incompatible
+	github.com/ahmetb/govvv v0.3.0 // indirect
 	github.com/certifi/gocertifi v0.0.0-20200211180108-c7c1fbc02894 // indirect
 	github.com/getsentry/raven-go v0.2.0
 	github.com/getsentry/sentry-go v0.6.1

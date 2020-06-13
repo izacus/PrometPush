@@ -1,6 +1,7 @@
 package src
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 
@@ -56,7 +57,33 @@ func ParseTrafficCameras(camerasChannel chan<- []Camera) error {
 		} `json:"Contents"`
 	}
 
-	dec.Decode(&data)
+	decodeErr := dec.Decode(&data)
+	if decodeErr != nil {
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(response.Body)
+
+		sentry.AddBreadcrumb(&sentry.Breadcrumb{
+			Category: "upstream-api",
+			Message:  buf.String(),
+			Level:    "error",
+		})
+
+		sentry.CaptureException(decodeErr)
+		if decodeErr != nil {
+			sentry.CaptureException(decodeErr)
+		} else {
+			sentry.CaptureMessage("Invalid upstream server response!")
+		}
+
+		log.Error("Invalid response from server!")
+		return err
+	}
+
+	if len(data.Contents) == 0 {
+		sentry.CaptureMessage("No camera data retrieved.")
+		return nil
+	}
+
 	items := data.Contents[0].Data.C
 
 	var cameras = make([]Camera, 0)

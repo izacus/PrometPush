@@ -78,6 +78,10 @@ func main() {
 		}
 	}
 
+	// Make sure Sentry captures panics.
+	defer sentry.Flush(time.Second * 5)
+	defer sentry.Recover()
+
 	if err := InitializeDbConnection(DebugMode); err != nil {
 		sentry.CaptureException(err)
 		panic("Failed to connect to database")

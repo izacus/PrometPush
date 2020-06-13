@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/getsentry/raven-go"
 	"github.com/getsentry/sentry-go"
 	log "github.com/sirupsen/logrus"
 )
@@ -49,10 +48,16 @@ func getEvents(english bool) ([]Dogodek, error) {
 		buf := new(bytes.Buffer)
 		buf.ReadFrom(response.Body)
 
+		sentry.AddBreadcrumb(&sentry.Breadcrumb{
+			Category: "upstream-api",
+			Message:  buf.String(),
+			Level:    "error",
+		})
+
 		if decodeError != nil {
-			raven.CaptureErrorAndWait(decodeError, map[string]string{"response": buf.String()})
+			sentry.CaptureException(decodeError)
 		} else {
-			raven.CaptureMessageAndWait("Invalid response received!", map[string]string{"response": buf.String()})
+			sentry.CaptureMessage("Invalid upstream server response!")
 		}
 
 		log.Error("Invalid response from server!")
@@ -123,7 +128,7 @@ func ParseTrafficEvents(eventIdsChannel chan<- []string, eventsChannel chan<- []
 		result := tx.Create(&item)
 		if result.Error != nil {
 			log.WithFields(log.Fields{"err": result.Error}).Error("Failed to create item!")
-			raven.CaptureErrorAndWait(result.Error, nil)
+			sentry.CaptureException(result.Error)
 		}
 
 		newEventIds = append(newEventIds, item.Id)
@@ -131,7 +136,7 @@ func ParseTrafficEvents(eventIdsChannel chan<- []string, eventsChannel chan<- []
 
 	result := tx.Commit()
 	if result.Error != nil {
-		raven.CaptureErrorAndWait(result.Error, nil)
+		sentry.CaptureException(result.Error)
 	}
 
 	log.WithFields(log.Fields{"num": len(items), "ids": newEventIds}).Info(len(newEventIds), " new events found.")

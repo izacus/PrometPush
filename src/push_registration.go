@@ -5,14 +5,20 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/getsentry/raven-go"
 	"github.com/getsentry/sentry-go"
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
 )
 
+// RegisterPush registers a new push target device.
 func RegisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	raven.SetHttpContext(raven.NewHttp(r))
+	sentry.ConfigureScope(func(scope *sentry.Scope) {
+		scope.SetContext("Request", map[string]string{
+			"Method": "GET",
+			"URL":    "/register",
+		})
+	})
+
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("Failed to read ApiKey from request.")
@@ -30,7 +36,7 @@ func RegisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	var count int32
 	query := tx.Model(&ApiKey{}).Where("key = ?", apiKeyStr).Count(&count)
 	if query.Error != nil {
-		raven.CaptureErrorAndWait(query.Error, nil)
+		sentry.CaptureException(query.Error)
 		log.WithFields(log.Fields{"err": query.Error}).Error("Failed to save new apikey to DB.")
 		returnError(w)
 		tx.Rollback()
@@ -39,7 +45,7 @@ func RegisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	if count == 0 {
 		query = tx.Create(&ApiKey{Key: apiKeyStr, RegistrationTime: time.Now().Unix(), UserAgent: r.UserAgent()})
 		if query.Error != nil {
-			raven.CaptureErrorAndWait(query.Error, nil)
+			sentry.CaptureException(query.Error)
 			log.WithFields(log.Fields{"err": query.Error}).Error("Failed to save new apikey to DB.")
 			tx.Rollback()
 			returnError(w)
@@ -58,8 +64,15 @@ func RegisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	w.Write([]byte("OK"))
 }
 
+// UnregisterPush removes registration of a client.
 func UnregisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	raven.SetHttpContext(raven.NewHttp(r))
+	sentry.ConfigureScope(func(scope *sentry.Scope) {
+		scope.SetContext("Request", map[string]string{
+			"Method": "GET",
+			"URL":    "/unregister",
+		})
+	})
+
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Error("Failed to read ApiKey from request.")
@@ -83,7 +96,7 @@ func UnregisterPush(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 	if count > 0 {
 		query := tx.Where("key = ?", apiKeyStr).Delete(ApiKey{})
 		if query.Error != nil {
-			raven.CaptureErrorAndWait(query.Error, nil)
+			sentry.CaptureException(query.Error)
 			log.WithFields(log.Fields{"err": query.Error, "apiKey": apiKeyStr, "ua": r.UserAgent()}).Error("Failed to unregister api api key!")
 			returnError(w)
 			tx.Rollback()
